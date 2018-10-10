@@ -41,6 +41,11 @@ response_msg request_msg::response() const {
 	return res;
 }
 
+bool request_msg::is_impl_dependent() const {
+	auto const& m = method();
+	return m[0] == '$' && m[1] == '/';
+}
+
 // Notification message
 
 json notification_msg::to_json() const {
@@ -50,6 +55,11 @@ json notification_msg::to_json() const {
 		res["params"] = *params_field;
 	}
 	return res;
+}
+
+bool notification_msg::is_impl_dependent() const {
+	auto const& m = method();
+	return m[0] == '$' && m[1] == '/';
 }
 
 // Generic message

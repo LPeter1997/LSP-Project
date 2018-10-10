@@ -137,6 +137,9 @@ struct request_msg {
 	json to_json() const;
 	response_msg response() const;
 
+	// Check if implementation dependent
+	bool is_impl_dependent() const;
+
 private:
 	json m_ID;
 	std::string m_Method;
@@ -167,6 +170,9 @@ struct notification_msg {
 
 	// Important operations
 	json to_json() const;
+
+	// Check if implementation dependent
+	bool is_impl_dependent() const;
 
 private:
 	std::string m_Method;
