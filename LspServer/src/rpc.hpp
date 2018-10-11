@@ -24,7 +24,7 @@ struct response_err {
 	response_err(response_err const&) = default;
 	response_err(response_err&&) = default;
 
-	explicit response_err(i32 code, std::string&& msg, opt<D>&& error)
+	explicit response_err(i32 code, str&& msg, opt<D>&& error)
 		: m_Code(code), m_Message(std::move(msg)), m_Data(std::move(error)) {
 	}
 
@@ -33,11 +33,11 @@ struct response_err {
 
 	// Getters and setters
 	i32& code() { return m_Code; }
-	std::string& message() { return m_Message; }
+	str& message() { return m_Message; }
 	opt<D>& data() { return m_Data; }
 
 	i32 const& code() const { return m_Code; }
-	std::string const& message() const { return m_Message; }
+	str const& message() const { return m_Message; }
 	opt<D> const& data() const { return m_Data; }
 
 	// Important operations
@@ -54,7 +54,7 @@ struct response_err {
 
 private:
 	i32 m_Code;
-	std::string m_Message;
+	str m_Message;
 	opt<D> m_Data;
 };
 
@@ -116,7 +116,7 @@ struct request_msg {
 	request_msg(request_msg const&) = default;
 	request_msg(request_msg&&) = default;
 
-	explicit request_msg(json&& id, std::string&& method, opt<json>&& params)
+	explicit request_msg(json&& id, str&& method, opt<json>&& params)
 		: m_ID(std::move(id)),
 		m_Method(std::move(method)), m_Params(std::move(params)) {
 	}
@@ -126,11 +126,11 @@ struct request_msg {
 
 	// Getters and setters
 	json& id() { return m_ID; }
-	std::string& method() { return m_Method; }
+	str& method() { return m_Method; }
 	opt<json>& params() { return m_Params; }
 
 	json const& id() const { return m_ID; }
-	std::string const& method() const { return m_Method; }
+	str const& method() const { return m_Method; }
 	opt<json> const& params() const { return m_Params; }
 
 	// Important operations
@@ -142,7 +142,7 @@ struct request_msg {
 
 private:
 	json m_ID;
-	std::string m_Method;
+	str m_Method;
 	opt<json> m_Params;
 };
 
@@ -154,7 +154,7 @@ struct notification_msg {
 	notification_msg(notification_msg const&) = default;
 	notification_msg(notification_msg&&) = default;
 
-	explicit notification_msg(std::string&& method, opt<json>&& params)
+	explicit notification_msg(str&& method, opt<json>&& params)
 		: m_Method(std::move(method)), m_Params(std::move(params)) {
 	}
 
@@ -162,10 +162,10 @@ struct notification_msg {
 	notification_msg& operator=(notification_msg&&) = default;
 
 	// Getters and setters
-	std::string& method() { return m_Method; }
+	str& method() { return m_Method; }
 	opt<json>& params() { return m_Params; }
 
-	std::string const& method() const { return m_Method; }
+	str const& method() const { return m_Method; }
 	opt<json> const& params() const { return m_Params; }
 
 	// Important operations
@@ -175,7 +175,7 @@ struct notification_msg {
 	bool is_impl_dependent() const;
 
 private:
-	std::string m_Method;
+	str m_Method;
 	opt<json> m_Params;
 };
 

@@ -77,7 +77,7 @@ json msg::to_json() const {
 
 struct msg_header {
 	u32 content_length = 0;
-	std::string content_type = "";
+	str content_type = "";
 };
 
 bool parse_msg_header_part(std::istream& in, msg_header& h) {
@@ -152,7 +152,7 @@ msg json_to_msg(json& js) {
 			// Request
 			return request_msg(
 				std::move(*id_it),
-				std::move(method_it->get<std::string>()),
+				std::move(method_it->get<str>()),
 				params_it == js.end() ? opt<json>() : *std::move(params_it)
 			);
 		}
@@ -172,7 +172,7 @@ msg json_to_msg(json& js) {
 		lsp_assert(method_it != js.end());
 		auto params_it = js.find("params");
 		return notification_msg(
-			std::move(method_it->get<std::string>()),
+			std::move(method_it->get<str>()),
 			params_it == js.end() ? opt<json>() : *std::move(params_it)
 		);
 	}

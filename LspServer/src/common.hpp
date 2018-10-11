@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cassert>
 #include <optional>
+#include <string>
 #include <variant>
 #include <vector>
 #include "json.hpp"
@@ -33,10 +34,17 @@ using u16 = std::uint16_t;
 using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 
+using str = std::string;
+
+template <typename T>
+using vec = std::vector<T>;
+
 using json = nlohmann::json;
 
 template <typename T>
 using opt = std::optional<T>;
+
+constexpr auto none = std::nullopt;
 
 template <typename... Ts>
 using sum = std::variant<Ts...>;

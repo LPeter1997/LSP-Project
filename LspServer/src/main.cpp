@@ -1,5 +1,6 @@
 #include <iostream>
 #include "common.hpp"
+#include "lsp.hpp"
 #include "rpc.hpp"
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -14,37 +15,20 @@ void platform_init() {
 void platform_init() { }
 #endif
 
-void process_message(lsp::msg& msg) {
-	switch (msg.type()) {
-	case lsp::msg::request: {
-		auto& req = msg.as_request();
-		std::cerr << "Got a request[" << req.id().dump() << "]: '" << req.method() << "'" << std::endl;
-	} return;
-
-	case lsp::msg::response: {
-		auto& resp = msg.as_response();
-		std::cerr << "Got a response[" << resp.id().dump() << "]" << std::endl;
-	} return;
-
-	case lsp::msg::notification: {
-		auto& notif = msg.as_notification();
-		std::cerr << "Got a notification: '" << notif.method() << "'" << std::endl;
-	} return;
-
-	default: lsp_unreachable;
+struct my_server : public lsp::i_server {
+	void init() override {
+		std::cerr << "Initialize!" << std::endl;
 	}
-}
-
-void start() {
-	platform_init();
-	auto reader = lsp::msg_reader(std::cin);
-	for (;;) {
-		auto msg = reader.next();
-		process_message(msg);
-	}
-}
+};
 
 int main() {
-	start();
+	platform_init();
+	auto reader = lsp::msg_reader(std::cin);
+	auto srvr = my_server();
+	auto handler = lsp::msg_handler(std::cout, srvr);
+	for (;;) {
+		auto msg = reader.next();
+		handler.handle(msg);
+	}
 	return 0;
 }
