@@ -13,6 +13,7 @@
 #include <cassert>
 #include <optional>
 #include <variant>
+#include <vector>
 #include "json.hpp"
 
 #define lsp_assert(x) assert(x)
