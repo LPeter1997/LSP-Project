@@ -411,7 +411,7 @@ struct initialize_params {
 #undef ctors
 
 struct i_server {
-	virtual void init() = 0;
+	virtual void init(initialize_params const&) = 0;
 };
 
 struct msg;

@@ -16,8 +16,14 @@ void platform_init() { }
 #endif
 
 struct my_server : public lsp::i_server {
-	void init() override {
+	void init(lsp::initialize_params const& p) override {
 		std::cerr << "Initialize!" << std::endl;
+		if (auto p1 = p.process_id()) {
+			std::cerr << "PID: " << *p1 << std::endl;
+		}
+		if (auto r = p.root()) {
+			std::cerr << "Root: " << *r << std::endl;
+		}
 	}
 };
 
