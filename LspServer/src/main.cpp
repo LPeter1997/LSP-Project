@@ -24,6 +24,10 @@ struct my_server : public lsp::i_server {
 		if (auto r = p.root()) {
 			std::cerr << "Root: " << *r << std::endl;
 		}
+		std::cerr << "Trace: " << (lsp::u32)p.trace() << std::endl;
+		if (auto i = p.initialization_options()) {
+			std::cerr << i->dump() << std::endl;
+		}
 	}
 };
 
@@ -34,6 +38,7 @@ int main() {
 	auto handler = lsp::msg_handler(std::cout, srvr);
 	for (;;) {
 		auto msg = reader.next();
+		//std::cerr << msg.to_json().dump() << std::endl;
 		handler.handle(msg);
 	}
 	return 0;

@@ -368,6 +368,7 @@ struct client_capabilities {
 
 	member(workspace_client_capabilities, m_Workspace, workspace);
 	member(text_document_client_capabilities, m_TextDocument, text_document);
+	member(opt<json>, m_Experimental, experimental);
 };
 
 /**
