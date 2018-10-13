@@ -28,6 +28,18 @@ struct my_server : public lsp::i_server {
 		if (auto i = p.initialization_options()) {
 			std::cerr << i->dump() << std::endl;
 		}
+		{
+			auto c = p.capabilities();
+			auto const& w = c.workspace();
+			if (auto e = w.workspace_edit()) {
+				std::cerr << "Doc change: " << e->document_changes() << std::endl;
+			}
+		}
+		if (auto const& wf = p.workspace_folders()) {
+			for (auto const& w : *wf) {
+				std::cerr << "WS folder: " << w.name() << " - " << w.uri() << std::endl;
+			}
+		}
 	}
 };
 
@@ -38,7 +50,7 @@ int main() {
 	auto handler = lsp::msg_handler(std::cout, srvr);
 	for (;;) {
 		auto msg = reader.next();
-		//std::cerr << msg.to_json().dump() << std::endl;
+		//std::cerr << "MSG: " << msg.to_json().dump() << std::endl;
 		handler.handle(msg);
 	}
 	return 0;
