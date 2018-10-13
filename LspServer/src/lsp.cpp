@@ -119,8 +119,22 @@ private:
 static symbol_kind to_symbol_kind(json const& js) {
 	lsp_assert(js.is_number());
 	auto num = js.get<i32>();
-	lsp_assert(num >= 1 && num <= 26);
+	lsp_assert(num >= 1 && num <= 26); // XXX(LPeter1997): Magic number!
 	return (symbol_kind)num;
+}
+
+static markup_kind to_markup_kind(json const& js) {
+	return map<str, markup_kind>({
+		{ "plaintext", markup_kind::plaintext },
+		{ "markdown", markup_kind::markdown },
+	})(js);
+}
+
+static completion_item_kind to_completion_item_kind(json const& js) {
+	lsp_assert(js.is_number());
+	auto num = js.get<i32>();
+	lsp_assert(num >= 1 && num <= 25); // XXX(LPeter1997): Magic number!
+	return (completion_item_kind)num;
 }
 
 static workspace_client_capabilities to_workspace_client_capabilities(json const& js) {
@@ -161,9 +175,96 @@ static workspace_client_capabilities to_workspace_client_capabilities(json const
 }
 
 static text_document_client_capabilities to_text_document_client_capabilities(json const& js) {
-	text_document_client_capabilities td;
-	// XXX(LPeter1997): Implement
-	return td;
+	using document = text_document_client_capabilities;
+	using synchronization = document::synchronization_t;
+	using completion = document::completion_t;
+	using completion_item = completion::completion_item_t;
+	using completion_item_kind = completion::completion_item_kind_t;
+	using hover = document::hover_t;
+	using signature_help = document::signature_help_t;
+	using signature_information = signature_help::signature_information_t;
+	using references = document::references_t;
+	using document_highlight = document::document_highlight_t;
+	using document_symbol = document::document_symbol_t;
+	using symbol_kind = document_symbol::symbol_kind_t;
+	using formatting = document::formatting_t;
+	using range_formatting = document::range_formatting_t;
+	using on_type_formatting = document::on_type_formatting_t;
+	using definition = document::definition_t;
+	using type_definition = document::type_definition_t;
+	using implementation = document::implementation_t;
+	using code_action = document::code_action_t;
+	using code_action_literal_support = code_action::code_action_literal_support_t;
+	using code_action_kind = code_action_literal_support::code_action_kind_t;
+	using code_lens = document::code_lens_t;
+	using document_link = document::document_link_t;
+	using color_provider = document::color_provider_t;
+	using rename = document::rename_t;
+	using publish_diagnostics = document::publish_diagnostics_t;
+	using folding_range = document::folding_range_t;
+
+	return json_factory<document>(js)
+		.opt(document::synchronization, "synchronization", sub<synchronization>([](auto& fact) { dyn_reg(fact)
+			.opt(synchronization::will_save, "willSave", pass<bool>)
+			.opt(synchronization::will_save_wait_until, "willSaveWaitUntil", pass<bool>)
+			.opt(synchronization::did_save, "didSave", pass<bool>);
+		}))
+		.opt(document::completion, "completion", sub<completion>([](auto& fact) { dyn_reg(fact)
+			.opt(completion::completion_item, "completionItem", sub<completion_item>([](auto& fact) { fact
+				.opt(completion_item::snippet_support, "snippetSupport", pass<bool>)
+				.opt(completion_item::commit_character_support, "commitCharactersSupport", pass<bool>)
+				.opt(completion_item::documentation_format, "documentationFormat", array(to_markup_kind))
+				.opt(completion_item::deprecated_support, "deprecatedSupport", pass<bool>)
+				.opt(completion_item::preselect_support, "preselectSupport", pass<bool>);
+			}))
+			.opt(completion::completion_item_kind, "completionItemKind", sub<completion_item_kind>([](auto& fact) { fact
+				.opt(completion_item_kind::value_set, "valueSet", array(to_completion_item_kind));
+			}))
+			.opt(completion::context_support, "contextSupport", pass<bool>);
+		}))
+		.opt(document::hover, "hover", sub<hover>([](auto& fact) { dyn_reg(fact)
+			.opt(hover::content_format, "contentFormat", array(to_markup_kind));
+		}))
+		.opt(document::signature_help, "signatureHelp", sub<signature_help>([](auto& fact) { dyn_reg(fact)
+			.opt(signature_help::signature_information, "signatureInformation", sub<signature_information>([](auto& fact) { fact
+				.opt(signature_information::documentation_format, "documentationFormat", array(to_markup_kind));
+			}));
+		}))
+		.opt(document::references, "references", sub_dyn_reg<references>())
+		.opt(document::document_highlight, "documentHighlight", sub_dyn_reg<document_highlight>())
+		.opt(document::document_symbol, "documentSymbol", sub<document_symbol>([](auto& fact) { dyn_reg(fact)
+			.opt(document_symbol::symbol_kind, "symbolKind", sub<symbol_kind>([](auto& fact) { fact
+				.opt(symbol_kind::value_set, "valueSet", array(to_symbol_kind));
+			}))
+			.opt(document_symbol::hierarchical_document_symbol_support, "hierarchicalDocumentSymbolSupport", pass<bool>);
+		}))
+		.opt(document::formatting, "formatting", sub_dyn_reg<formatting>())
+		.opt(document::range_formatting, "rangeFormatting", sub_dyn_reg<range_formatting>())
+		.opt(document::on_type_formatting, "onTypeFormatting", sub_dyn_reg<on_type_formatting>())
+		.opt(document::definition, "definition", sub_dyn_reg<definition>())
+		.opt(document::type_definition, "typeDefinition", sub_dyn_reg<type_definition>())
+		.opt(document::implementation, "implementation", sub_dyn_reg<implementation>())
+		.opt(document::code_action, "codeAction", sub<code_action>([](auto& fact) { dyn_reg(fact)
+			.opt(code_action::code_action_literal_support, "codeActionLiteralSupport", sub<code_action_literal_support>([](auto& fact) { fact
+				.req(code_action_literal_support::code_action_kind, "codeActionKind", sub<code_action_kind>([](auto& fact) { fact
+					.req(code_action_kind::value_set, "valueSet", array(pass<str>)); // XXX(LPeter1997): It's a '.' separated list, we should process it
+				}));
+			}));
+		}))
+		.opt(document::code_lens, "codeLens", sub_dyn_reg<code_lens>())
+		.opt(document::document_link, "documentLink", sub_dyn_reg<document_link>())
+		.opt(document::color_provider, "colorProvider", sub_dyn_reg<color_provider>())
+		.opt(document::rename, "rename", sub<rename>([](auto& fact) { dyn_reg(fact)
+			.opt(rename::prepare_support, "prepareSupport", pass<bool>);
+		}))
+		.opt(document::publish_diagnostics, "publishDiagnostics", sub<publish_diagnostics>([](auto& fact) { fact
+			.opt(publish_diagnostics::related_information, "relatedInformation", pass<bool>);
+		}))
+		.opt(document::folding_range, "foldingRange", sub<folding_range>([](auto& fact) { dyn_reg(fact)
+			.opt(folding_range::range_limit, "rangeLimit", pass<i32>)
+			.opt(folding_range::line_folding_only, "lineFoldingOnly", pass<bool>);
+		}))
+		.get();
 }
 
 static client_capabilities to_client_capabilities(json const& js) {

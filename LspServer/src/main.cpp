@@ -34,6 +34,9 @@ struct my_server : public lsp::i_server {
 			if (auto e = w.workspace_edit()) {
 				std::cerr << "Doc change: " << e->document_changes() << std::endl;
 			}
+			if (auto const& dc = w.did_change_configuration()) {
+				std::cerr << "didChangeConfiguration: " << dc->dynamic_registration() << std::endl;
+			}
 		}
 		if (auto const& wf = p.workspace_folders()) {
 			for (auto const& w : *wf) {
@@ -50,7 +53,7 @@ int main() {
 	auto handler = lsp::msg_handler(std::cout, srvr);
 	for (;;) {
 		auto msg = reader.next();
-		//std::cerr << "MSG: " << msg.to_json().dump() << std::endl;
+		std::cerr << "MSG: " << msg.to_json().dump() << std::endl;
 		handler.handle(msg);
 	}
 	return 0;
