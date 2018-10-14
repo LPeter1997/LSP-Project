@@ -86,12 +86,27 @@ enum class completion_item_kind {
 	type_parameter = 25,
 };
 
+enum class text_document_sync_kind {
+	none = 0,
+	full = 1,
+	incremental = 2,
+};
+
 #define member(ty, name, access) 				\
 public:											\
 	ty& access() { return name; }				\
 	ty const& access() const { return name; }	\
 private:										\
 	ty name
+
+#define member_b(ty, name, access)	\
+public:								\
+template <typename T>				\
+auto& access(T&& val) {				\
+access() = std::forward<T>(val);	\
+return *this;						\
+}									\
+member(ty, name, access)
 
 #define ctors(name)						\
 name() = default;						\
@@ -382,7 +397,7 @@ struct workspace_folder {
 };
 
 /**
- * InitializeParams, the 'params' for the 'initialize' request.
+ * InitializeParams, the params for the 'initialize' request.
  */
 struct initialize_params {
 	enum class trace_kind {
@@ -407,8 +422,216 @@ struct initialize_params {
 	member(opt<vec<workspace_folder>>, m_WorkspaceFolders, workspace_folders) = none;
 };
 
+/**
+ * SaveOptions.
+ */
+struct save_options {
+	ctors(save_options);
+
+	member_b(bool, m_IncludeText, include_text) = false;
+};
+
+/**
+ * TextDocumentSyncOptions.
+ */
+struct text_document_sync_options {
+	ctors(text_document_sync_options);
+
+	member_b(bool, m_OpenClose, open_close) = false;
+	member_b(text_document_sync_kind, m_Change, change) = text_document_sync_kind::none;
+	member_b(bool, m_WillSave, will_save) = false;
+	member_b(bool, m_WillSaveWaitUntil, will_save_wait_until) = false;
+	member_b(opt<save_options>, m_Save, save) = none;
+};
+
+/**
+ * CompletionOptions.
+ */
+struct completion_options {
+	ctors(completion_options);
+
+	member_b(bool, m_ResolveProvider, resolve_provider) = false;
+	member_b(opt<vec<char>>, m_TriggerCharacters, trigger_characters) = none;
+};
+
+/**
+ * SignatureHelpOptions.
+ */
+struct signature_help_options {
+	ctors(signature_help_options);
+
+	member_b(opt<vec<char>>, m_TriggerCharacters, trigger_characters);
+};
+
+/**
+ * DocumentFilter.
+ */
+struct document_filter {
+	ctors(document_filter);
+
+	member_b(str, m_Language, language);
+	member_b(str, m_Scheme, scheme);
+	member_b(str, m_Pattern, pattern);
+};
+
+/**
+ * DocumentSelector.
+ */
+using document_selector = vec<document_filter>;
+
+/**
+ * TextDocumentRegistrationOptions.
+ */
+struct text_document_registration_options {
+	ctors(text_document_registration_options);
+
+	member_b(opt<::lsp::document_selector>, m_DocumentSelector, document_selector) = none;
+};
+
+/**
+ * StaticRegistrationOptions.
+ */
+struct static_registration_options {
+	ctors(static_registration_options);
+
+	member_b(opt<str>, m_ID, id) = none;
+};
+
+/**
+ * CodeActionOptions.
+ */
+struct code_action_options {
+	ctors(code_action_options);
+
+	member_b(opt<vec<code_action_kind>>, m_CodeActionKinds, code_action_kinds) = none;
+};
+
+/**
+ * CodeLensOptions.
+ */
+struct code_lens_options {
+	ctors(code_lens_options);
+
+	member_b(bool, m_ResolveProvider, resolve_provider) = false;
+};
+
+/**
+ * DocumentOnTypeFormattingOptions.
+ */
+struct document_on_type_formatting_options {
+	ctors(document_on_type_formatting_options);
+
+	member_b(char, m_FirstTriggerCharacter, first_trigger_character);
+	member_b(opt<vec<char>>, m_MoreTriggerCharacters, more_trigger_characters) = none;
+};
+
+/**
+ * RenameOptions.
+ */
+struct rename_options {
+	ctors(rename_options);
+
+	member_b(bool, m_PrepareProvider, prepare_provider) = false;
+};
+
+/**
+ * DocumentLinkOptions.
+ */
+struct document_link_options {
+	ctors(document_link_options);
+
+	member_b(bool, m_ResolveProvider, resolve_provider) = false;
+};
+
+/**
+ * ColorProviderOptions.
+ */
+struct color_provider_options {
+	ctors(color_provider_options);
+};
+
+/**
+ * FoldingRangeProviderOptions.
+ */
+struct folding_range_provider_options {
+	ctors(folding_range_provider_options);
+};
+
+/**
+ * ExecuteCommandOptions.
+ */
+struct execute_command_options {
+	ctors(execute_command_options);
+
+	member_b(vec<str>, m_Commands, commands);
+};
+
+/**
+ * ServerCapabilities.
+ */
+struct server_capabilities {
+	using text_document_sync_t = sum<text_document_sync_options, text_document_sync_kind>;
+	using type_definition_provider_t = sum<bool, prod<text_document_registration_options, static_registration_options>>;
+	using implementation_provider_t = type_definition_provider_t;
+	using code_action_provider_t = sum<bool, code_action_options>;
+	using rename_provider_t = sum<bool, rename_options>;
+	using color_provider_t = sum<bool, color_provider_options, prod<color_provider_options, text_document_registration_options, static_registration_options>>;
+	using folding_range_provider_t = sum<bool, folding_range_provider_options, prod<folding_range_provider_options, text_document_registration_options, static_registration_options>>;
+
+	struct workspace_t {
+		struct workspace_folders_t {
+			using change_notifications_t = sum<bool, str>;
+
+			ctors(workspace_folders_t);
+
+			member_b(bool, m_Supported, supported);
+			member_b(change_notifications_t, m_ChangeNotifications, change_notifications) = false;
+		};
+
+		ctors(workspace_t);
+
+		member_b(opt<workspace_folders_t>, m_WorkspaceFolders, workspace_folders) = none;
+	};
+
+	ctors(server_capabilities);
+
+	member_b(text_document_sync_t, m_TextDocumentSync, text_document_sync) = text_document_sync_kind::none;
+	member_b(bool, m_HoverProvider, hover_provider) = false;
+	member_b(opt<completion_options>, m_CompletionProvider, completion_provider) = none;
+	member_b(opt<signature_help_options>, m_SignatureHelpProvider, signature_help_provider) = none;
+	member_b(bool, m_DefinitionProvider, definition_provider) = false;
+	member_b(type_definition_provider_t, m_TypeDefinitionProvider, type_definition_provider) = false;
+	member_b(implementation_provider_t, m_ImplementationProvider, implementation_provider) = false;
+	member_b(bool, m_ReferencesProvider, references_provider) = false;
+	member_b(bool, m_DocumentHighlightProvider, document_highlight_provider) = false;
+	member_b(bool, m_DocumentSymbolProvider, document_symbol_provider) = false;
+	member_b(bool, m_WorkspaceSymbolProvider, workspace_symbol_provider) = false;
+	member_b(code_action_provider_t, m_CodeActionProvider, code_action_provider) = false;
+	member_b(opt<code_lens_options>, m_CodeLensOptions, code_lens_provider);
+	member_b(bool, m_DocumentFormattingProvider, document_formatting_provider) = false;
+	member_b(bool, m_DocumentRangeFormattingProvider, document_range_formatting_provider) = false;
+	member_b(opt<document_on_type_formatting_options>, m_DocumentOnTypeFormattingProvider, document_on_type_formatting_provider) = none;
+	member_b(rename_provider_t, m_RenameProvider, rename_provider) = false;
+	member_b(opt<document_link_options>, m_DocumentLinkProvider, document_link_provider) = none;
+	member_b(color_provider_t, m_ColorProvider, color_provider) = false;
+	member_b(folding_range_provider_t, m_FoldingRangeProvider, folding_range_provider) = false;
+	member_b(opt<execute_command_options>, m_ExecuteCommandProvider, execute_command_provider) = none;
+	member_b(opt<workspace_t>, m_Workspace, workspace) = none;
+	member_b(opt<json>, m_Experimental, experimental);
+};
+
+/**
+ * InitializeResult, the answer to an initialization request.
+ */
+struct initialize_result {
+	ctors(initialize_result);
+
+	member_b(server_capabilities, m_Capabilities, capabilities);
+};
+
 #undef dyn_reg
 #undef member
+#undef member_b
 #undef ctors
 
 struct i_server {

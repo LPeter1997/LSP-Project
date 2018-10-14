@@ -295,7 +295,6 @@ static opt<vec<workspace_folder>> to_workspace_folder_list(json const& js) {
 }
 
 static initialize_params to_initialize_params(json& js) {
-	// XXX(LPeter1997): Implement workspace folders
 	return json_factory<initialize_params>(js)
 		.req(initialize_params::process_id, "processId", nullable_to_opt<i32>)
 		.opt(initialize_params::root_path, "rootPath", nullable_to_opt<str>)

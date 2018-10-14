@@ -13,6 +13,7 @@
 #include <cassert>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <variant>
 #include <vector>
 #include "json.hpp"
@@ -48,6 +49,9 @@ constexpr auto none = std::nullopt;
 
 template <typename... Ts>
 using sum = std::variant<Ts...>;
+
+template <typename... Ts>
+using prod = std::tuple<Ts...>;
 
 }
 
