@@ -428,6 +428,8 @@ struct initialize_params {
 struct save_options {
 	ctors(save_options);
 
+	json to_json() const;
+
 	member_b(bool, m_IncludeText, include_text) = false;
 };
 
@@ -436,6 +438,8 @@ struct save_options {
  */
 struct text_document_sync_options {
 	ctors(text_document_sync_options);
+
+	json to_json() const;
 
 	member_b(bool, m_OpenClose, open_close) = false;
 	member_b(text_document_sync_kind, m_Change, change) = text_document_sync_kind::none;
@@ -450,6 +454,8 @@ struct text_document_sync_options {
 struct completion_options {
 	ctors(completion_options);
 
+	json to_json() const;
+
 	member_b(bool, m_ResolveProvider, resolve_provider) = false;
 	member_b(opt<vec<char>>, m_TriggerCharacters, trigger_characters) = none;
 };
@@ -460,6 +466,8 @@ struct completion_options {
 struct signature_help_options {
 	ctors(signature_help_options);
 
+	json to_json() const;
+
 	member_b(opt<vec<char>>, m_TriggerCharacters, trigger_characters);
 };
 
@@ -469,9 +477,11 @@ struct signature_help_options {
 struct document_filter {
 	ctors(document_filter);
 
-	member_b(str, m_Language, language);
-	member_b(str, m_Scheme, scheme);
-	member_b(str, m_Pattern, pattern);
+	json to_json() const;
+
+	member_b(opt<str>, m_Language, language) = none;
+	member_b(opt<str>, m_Scheme, scheme) = none;
+	member_b(opt<str>, m_Pattern, pattern) = none;
 };
 
 /**
@@ -485,6 +495,8 @@ using document_selector = vec<document_filter>;
 struct text_document_registration_options {
 	ctors(text_document_registration_options);
 
+	json to_json() const;
+
 	member_b(opt<::lsp::document_selector>, m_DocumentSelector, document_selector) = none;
 };
 
@@ -493,6 +505,8 @@ struct text_document_registration_options {
  */
 struct static_registration_options {
 	ctors(static_registration_options);
+
+	json to_json() const;
 
 	member_b(opt<str>, m_ID, id) = none;
 };
@@ -503,6 +517,8 @@ struct static_registration_options {
 struct code_action_options {
 	ctors(code_action_options);
 
+	json to_json() const;
+
 	member_b(opt<vec<code_action_kind>>, m_CodeActionKinds, code_action_kinds) = none;
 };
 
@@ -512,6 +528,8 @@ struct code_action_options {
 struct code_lens_options {
 	ctors(code_lens_options);
 
+	json to_json() const;
+
 	member_b(bool, m_ResolveProvider, resolve_provider) = false;
 };
 
@@ -520,6 +538,8 @@ struct code_lens_options {
  */
 struct document_on_type_formatting_options {
 	ctors(document_on_type_formatting_options);
+
+	json to_json() const;
 
 	member_b(char, m_FirstTriggerCharacter, first_trigger_character);
 	member_b(opt<vec<char>>, m_MoreTriggerCharacters, more_trigger_characters) = none;
@@ -531,6 +551,8 @@ struct document_on_type_formatting_options {
 struct rename_options {
 	ctors(rename_options);
 
+	json to_json() const;
+
 	member_b(bool, m_PrepareProvider, prepare_provider) = false;
 };
 
@@ -540,6 +562,8 @@ struct rename_options {
 struct document_link_options {
 	ctors(document_link_options);
 
+	json to_json() const;
+
 	member_b(bool, m_ResolveProvider, resolve_provider) = false;
 };
 
@@ -548,6 +572,8 @@ struct document_link_options {
  */
 struct color_provider_options {
 	ctors(color_provider_options);
+
+	json to_json() const;
 };
 
 /**
@@ -555,6 +581,8 @@ struct color_provider_options {
  */
 struct folding_range_provider_options {
 	ctors(folding_range_provider_options);
+
+	json to_json() const;
 };
 
 /**
@@ -562,6 +590,8 @@ struct folding_range_provider_options {
  */
 struct execute_command_options {
 	ctors(execute_command_options);
+
+	json to_json() const;
 
 	member_b(vec<str>, m_Commands, commands);
 };
@@ -584,16 +614,22 @@ struct server_capabilities {
 
 			ctors(workspace_folders_t);
 
+			json to_json() const;
+
 			member_b(bool, m_Supported, supported);
 			member_b(change_notifications_t, m_ChangeNotifications, change_notifications) = false;
 		};
 
 		ctors(workspace_t);
 
+		json to_json() const;
+
 		member_b(opt<workspace_folders_t>, m_WorkspaceFolders, workspace_folders) = none;
 	};
 
 	ctors(server_capabilities);
+
+	json to_json() const;
 
 	member_b(text_document_sync_t, m_TextDocumentSync, text_document_sync) = text_document_sync_kind::none;
 	member_b(bool, m_HoverProvider, hover_provider) = false;
@@ -626,6 +662,8 @@ struct server_capabilities {
 struct initialize_result {
 	ctors(initialize_result);
 
+	json to_json() const;
+
 	member_b(server_capabilities, m_Capabilities, capabilities);
 };
 
@@ -635,7 +673,7 @@ struct initialize_result {
 #undef ctors
 
 struct i_server {
-	virtual void init(initialize_params const&) = 0;
+	virtual initialize_result init(initialize_params const&) = 0;
 };
 
 struct msg;

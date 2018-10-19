@@ -3,7 +3,7 @@
 
 namespace lsp {
 
-static json json_msg_base() {
+json rpc_base() {
 	return json{
 		{ "jsonrpc", "2.0" }
 	};
@@ -12,7 +12,7 @@ static json json_msg_base() {
 // Response message
 
 json response_msg::to_json() const {
-	json res = json_msg_base();
+	json res = rpc_base();
 	res["id"] = id();
 	if (auto const& res_field = result(); res_field) {
 		res["result"] = *res_field;
@@ -26,7 +26,7 @@ json response_msg::to_json() const {
 // Request message
 
 json request_msg::to_json() const {
-	json res = json_msg_base();
+	json res = rpc_base();
 	res["id"] = id();
 	res["method"] = method();
 	if (auto const& params_field = params(); params_field) {
@@ -49,7 +49,7 @@ bool request_msg::is_impl_dependent() const {
 // Notification message
 
 json notification_msg::to_json() const {
-	json res = json_msg_base();
+	json res = rpc_base();
 	res["method"] = method();
 	if (auto const& params_field = params(); params_field) {
 		res["params"] = *params_field;
@@ -141,6 +141,7 @@ response_err<json> json_to_response_err(json& js) {
 }
 
 msg json_to_msg(json& js) {
+	std::cerr << "Parsing..." << std::endl;
 	auto id_it = js.find("id");
 	auto method_it = js.find("method");
 

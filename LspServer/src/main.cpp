@@ -16,33 +16,13 @@ void platform_init() { }
 #endif
 
 struct my_server : public lsp::i_server {
-	void init(lsp::initialize_params const& p) override {
-		std::cerr << "Initialize!" << std::endl;
-		if (auto p1 = p.process_id()) {
-			std::cerr << "PID: " << *p1 << std::endl;
-		}
-		if (auto r = p.root()) {
-			std::cerr << "Root: " << *r << std::endl;
-		}
-		std::cerr << "Trace: " << (lsp::u32)p.trace() << std::endl;
-		if (auto i = p.initialization_options()) {
-			std::cerr << i->dump() << std::endl;
-		}
-		{
-			auto c = p.capabilities();
-			auto const& w = c.workspace();
-			if (auto e = w.workspace_edit()) {
-				std::cerr << "Doc change: " << e->document_changes() << std::endl;
-			}
-			if (auto const& dc = w.did_change_configuration()) {
-				std::cerr << "didChangeConfiguration: " << dc->dynamic_registration() << std::endl;
-			}
-		}
-		if (auto const& wf = p.workspace_folders()) {
-			for (auto const& w : *wf) {
-				std::cerr << "WS folder: " << w.name() << " - " << w.uri() << std::endl;
-			}
-		}
+	lsp::initialize_result init(lsp::initialize_params const& p) override {
+		return lsp::initialize_result().capabilities(lsp::server_capabilities()
+			.text_document_sync(lsp::text_document_sync_options()
+				.open_close(true)
+				.change(lsp::text_document_sync_kind::full)
+			)
+		);
 	}
 };
 

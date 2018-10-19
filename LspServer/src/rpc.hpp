@@ -15,6 +15,8 @@
 
 namespace lsp {
 
+json rpc_base();
+
 /**
  * Response error.
  */

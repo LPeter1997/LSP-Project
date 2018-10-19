@@ -310,6 +310,324 @@ static initialize_params to_initialize_params(json& js) {
 		.get();
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+void cat_jsons_impl(json& js) { }
+
+template <typename First, typename... Rest>
+void cat_jsons_impl(json& js, First const& f, Rest const&... r) {
+	for (json::const_iterator it = f.begin(); it != f.end(); ++it) {
+		js[it.key()] = it.value();
+	}
+	cat_jsons_impl(js, r...);
+}
+
+template <typename... Jsons>
+json cat_jsons(Jsons const&... jsons) {
+	json res;
+	cat_jsons_impl(res, jsons...);
+	return res;
+}
+
+json save_options::to_json() const {
+	return json{
+		{ "includeText", include_text() },
+	};
+}
+
+json text_document_sync_options::to_json() const {
+	auto res = json{
+		{ "openClose", open_close() },
+		{ "change", i32(change()) },
+		{ "willSave", will_save() },
+		{ "willSaveWaitUntil", will_save_wait_until() },
+	};
+	if (auto const& s = save()) {
+		res["save"] = s->to_json();
+	}
+	return res;
+}
+
+json server_capabilities::workspace_t::workspace_folders_t::to_json() const {
+	auto res = json{
+		{ "supported", supported() },
+	};
+	auto const& cn = change_notifications();
+	if (std::holds_alternative<bool>(cn)) {
+		res["changeNotifications"] = std::get<bool>(cn);
+	}
+	else {
+		res["changeNotifications"] = std::get<str>(cn);
+	}
+	return res;
+}
+
+json server_capabilities::workspace_t::to_json() const {
+	auto res = json{};
+	if (auto const& wf = workspace_folders()) {
+		res["workspaceFolders"] = wf->to_json();
+	}
+	return res;
+}
+
+json completion_options::to_json() const {
+	auto res = json{
+		{ "resolveProvider", resolve_provider() },
+	};
+	if (auto const& tc = trigger_characters()) {
+		json l;
+		for (auto const& c : *tc) {
+			l.push_back(c);
+		}
+		res["triggerCharacters"] = l;
+	}
+	return res;
+}
+
+json signature_help_options::to_json() const {
+	json res;
+	if (auto const& tc = trigger_characters()) {
+		for (auto const& c : *tc) {
+			res.push_back(c);
+		}
+	}
+	return res;
+}
+
+json document_filter::to_json() const {
+	json res;
+	if (auto const& l = language()) {
+		res["language"] = *l;
+	}
+	if (auto const& s = scheme()) {
+		res["scheme"] = *s;
+	}
+	if (auto const& p = pattern()) {
+		res["pattern"] = *p;
+	}
+	return res;
+}
+
+json text_document_registration_options::to_json() const {
+	json res;
+	if (auto const& ds = document_selector()) {
+		json l;
+		for (auto const& f : *ds) {
+			l.push_back(f.to_json());
+		}
+		res["documentSelector"] = l;
+	}
+	return res;
+}
+
+json static_registration_options::to_json() const {
+	json res;
+	if (auto const& i = id()) {
+		res["id"] = *i;
+	}
+	return res;
+}
+
+json code_action_options::to_json() const {
+	json res;
+	if (auto const& ck = code_action_kinds()) {
+		json l;
+		for (auto const& k : *ck) {
+			l.push_back(k);
+		}
+		res["codeActionKinds"] = l;
+	}
+	return res;
+}
+
+json code_lens_options::to_json() const {
+	return json{
+		{ "resolveProvider", resolve_provider() },
+	};
+}
+
+json document_on_type_formatting_options::to_json() const {
+	auto res = json{
+		{ "firstTriggerCharacter", first_trigger_character() },
+	};
+	if (auto const& mt = more_trigger_characters()) {
+		json l;
+		for (auto const& c : *mt) {
+			l.push_back(c);
+		}
+		res["moreTriggerCharacter"] = l;
+	}
+	return res;
+}
+
+json rename_options::to_json() const {
+	return json{
+		{ "prepareProvider", prepare_provider() },
+	};
+}
+
+json document_link_options::to_json() const {
+	return json{
+		{ "resolveProvider", resolve_provider() },
+	};
+}
+
+json color_provider_options::to_json() const {
+	return json{};
+}
+
+json folding_range_provider_options::to_json() const {
+	return json{};
+}
+
+json execute_command_options::to_json() const {
+	json l;
+	auto const& cmds = commands();
+	for (auto const& c : cmds) {
+		l.push_back(c);
+	}
+	return json{
+		{ "commands", l },
+	};
+}
+
+json server_capabilities::to_json() const {
+	auto res = json{
+		{ "hoverProvider", hover_provider() },
+		{ "definitionProvider", definition_provider() },
+		{ "referencesProvider", references_provider() },
+		{ "documentHighlightProvider", document_highlight_provider() },
+		{ "documentSymbolProvider", document_symbol_provider() },
+		{ "workspaceSymbolProvider", workspace_symbol_provider() },
+		{ "documentFormattingProvider", document_formatting_provider() },
+		{ "documentRangeFormattingProvider", document_range_formatting_provider() },
+	};
+
+	auto const& ts = text_document_sync();
+	if (std::holds_alternative<text_document_sync_options>(ts)) {
+		res["textDocumentSync"] = std::get<text_document_sync_options>(ts).to_json();
+	}
+	else {
+		res["textDocumentSync"] = i32(std::get<text_document_sync_kind>(ts));
+	}
+
+	if (auto const& cp = completion_provider()) {
+		res["completionProvider"] = cp->to_json();
+	}
+	if (auto const& sp = signature_help_provider()) {
+		res["signatureHelpProvider"] = sp->to_json();
+	}
+
+	auto const& tp = type_definition_provider();
+	if (std::holds_alternative<bool>(tp)) {
+		res["typeDefinitionProvider"] = std::get<bool>(tp);
+	}
+	else {
+		auto const& tup = std::get<prod<text_document_registration_options, static_registration_options>>(tp);
+		res["typeDefinitionProvider"] = cat_jsons(
+			std::get<0>(tup).to_json(),
+			std::get<1>(tup).to_json()
+		);
+	}
+
+	auto const& ip = implementation_provider();
+	if (std::holds_alternative<bool>(ip)) {
+		res["implementationProvider"] = std::get<bool>(ip);
+	}
+	else {
+		auto const& tup = std::get<prod<text_document_registration_options, static_registration_options>>(ip);
+		res["implementationProvider"] = cat_jsons(
+			std::get<0>(tup).to_json(),
+			std::get<1>(tup).to_json()
+		);
+	}
+
+	auto const& cp = code_action_provider();
+	if (std::holds_alternative<bool>(cp)) {
+		res["codeActionProvider"] = std::get<bool>(cp);
+	}
+	else {
+		auto const& t = std::get<code_action_options>(cp);
+		res["codeActionProvider"] = t.to_json();
+	}
+
+	if (auto const& cp = code_lens_provider()) {
+		res["codeLensProvider"] = cp->to_json();
+	}
+
+	if (auto const& dp = document_on_type_formatting_provider()) {
+		res["documentOnTypeFormattingProvider"] = dp->to_json();
+	}
+
+	auto const& rp = rename_provider();
+	if (std::holds_alternative<bool>(rp)) {
+		res["renameProvider"] = std::get<bool>(rp);
+	}
+	else {
+		res["renameProvider"] = std::get<rename_options>(rp).to_json();
+	}
+
+	if (auto const& dp = document_link_provider()) {
+		res["documentLinkProvider"] = dp->to_json();
+	}
+
+	{
+	auto const& cp = color_provider();
+	if (std::holds_alternative<bool>(cp)) {
+		res["colorProvider"] = std::get<bool>(cp);
+	}
+	else if (std::holds_alternative<color_provider_options>(cp)) {
+		res["colorProvider"] = std::get<color_provider_options>(cp).to_json();
+	}
+	else {
+		auto const& tup = std::get<prod<color_provider_options, text_document_registration_options, static_registration_options>>(cp);
+		res["colorProvider"] = cat_jsons(
+			std::get<0>(tup).to_json(),
+			std::get<1>(tup).to_json(),
+			std::get<2>(tup).to_json()
+		);
+	}
+	}
+
+	auto const& fp = folding_range_provider();
+	if (std::holds_alternative<bool>(fp)) {
+		res["foldingRangeProvider"] = std::get<bool>(fp);
+	}
+	else if (std::holds_alternative<folding_range_provider_options>(fp)) {
+		res["foldingRangeProvider"] = std::get<folding_range_provider_options>(fp).to_json();
+	}
+	else {
+		auto const& tup = std::get<prod<folding_range_provider_options, text_document_registration_options, static_registration_options>>(fp);
+		res["foldingRangeProvider"] = cat_jsons(
+			std::get<0>(tup).to_json(),
+			std::get<1>(tup).to_json(),
+			std::get<2>(tup).to_json()
+		);
+	}
+
+	if (auto const& ep = execute_command_provider()) {
+		res["executeCommandProvider"] = ep->to_json();
+	}
+
+	if (auto const& ws = workspace()) {
+		res["workspace"] = ws->to_json();
+	}
+
+	if (auto const& ex = experimental()) {
+		res["experimental"] = *ex;
+	}
+
+	return res;
+}
+
+json initialize_result::to_json() const {
+	return json{
+		{ "capabilities", capabilities().to_json() },
+	};
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void msg_handler::handle(msg& m) {
 	if (!m_Initialized) {
 		switch (m.type()) {
@@ -318,8 +636,14 @@ void msg_handler::handle(msg& m) {
 			if (req.method() == "initialize") {
 				lsp_assert(req.params());
 				// XXX(LPeter1997): If the process_id is null, exit
-				m_Server->init(to_initialize_params(*req.params()));
+				auto reply_res = m_Server->init(to_initialize_params(*req.params()));
 				m_Initialized = true; // XXX(LPeter1997): Only if success?
+
+				// We reply
+				auto reply = req.response();
+				reply.result() = reply_res.to_json();
+				*m_Ostream << reply.to_json().dump();
+				std::cerr << "Replied to init with: " << reply.to_json().dump(4) << std::endl;
 			}
 			else {
 				// XXX(LPeter1997): Send error if not init
