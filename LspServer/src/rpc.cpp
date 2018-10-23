@@ -114,7 +114,7 @@ bool parse_msg_header_part(std::istream& in, msg_header& h) {
 
 msg_header parse_msg_header(std::istream& in) {
 	msg_header h;
-	while (parse_msg_header_part(in, h));
+	while (parse_msg_header_part(in, h)) std::cerr << "Got header part" << std::endl;
 	return h;
 }
 
@@ -141,7 +141,6 @@ response_err<json> json_to_response_err(json& js) {
 }
 
 msg json_to_msg(json& js) {
-	std::cerr << "Parsing..." << std::endl;
 	auto id_it = js.find("id");
 	auto method_it = js.find("method");
 
@@ -180,7 +179,9 @@ msg json_to_msg(json& js) {
 }
 
 msg msg_reader::next() {
+	std::cerr << "next()" << std::endl;
 	auto h = parse_msg_header(*m_Stream);
+	std::cerr << "Past header, getting content..." << std::endl;
 	auto cont = parse_msg_content(*m_Stream, h);
 	return json_to_msg(cont);
 }

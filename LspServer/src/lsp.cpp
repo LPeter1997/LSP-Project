@@ -642,7 +642,10 @@ void msg_handler::handle(msg& m) {
 				// We reply
 				auto reply = req.response();
 				reply.result() = reply_res.to_json();
-				*m_Ostream << reply.to_json().dump();
+				auto reply_js = reply.to_json().dump();
+				// XXX(LPeter1997): Cleanup
+				*m_Ostream << "Content-Length: " << reply_js.length() << "\r\n\r\n";
+				*m_Ostream << reply_js << std::flush;
 				std::cerr << "Replied to init with: " << reply.to_json().dump(4) << std::endl;
 			}
 			else {
