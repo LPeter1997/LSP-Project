@@ -262,7 +262,6 @@ client_capabilities client_capabilities::from_json(json const& js) {
 workspace_client_capabilities workspace_client_capabilities::from_json(json const& js) {
 	auto jw = jwrap(js);
 	return workspace_client_capabilities()
-		// XXX(LPeter1997): Implement
 		.apply_edit(def(jw.opt<bool>("applyEdit"), false))
 		.workspace_edit(jw.opt("workspaceEdit") | workspace_edit_t::from_json)
 		.did_change_configuration(jw.opt("didChangeConfiguration") | did_change_configuration_t::from_json)
@@ -337,7 +336,6 @@ workspace_client_capabilities::execute_command_t workspace_client_capabilities::
 text_document_client_capabilities text_document_client_capabilities::from_json(json const& js) {
 	auto jw = jwrap(js);
 	return text_document_client_capabilities()
-		// XXX(LPeter1997): Implement
 		.synchronization(jw.opt("synchronization") | synchronization_t::from_json)
 		.completion(jw.opt("completion") | completion_t::from_json)
 		.hover(jw.opt("hover") | hover_t::from_json)

@@ -599,7 +599,6 @@ struct text_document_client_capabilities {
 
 	static text_document_client_capabilities from_json(json const& js);
 
-	// XXX(LPeter1997): Implement
 	named_mem(std::optional<synchronization_t>, synchronization) = std::nullopt;
 	named_mem(std::optional<completion_t>, completion) = std::nullopt;
 	named_mem(std::optional<hover_t>, hover) = std::nullopt;
