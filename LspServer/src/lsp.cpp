@@ -99,10 +99,20 @@ void langserver_handler::next() {
 			m_Initialized = true;
 		}
 		else {
+			std::cerr
+				<< "Unknown request:"
+				<< std::endl
+				<< req.to_json().dump(4)
+				<< std::endl;
 			lsp_unimplemented;
 		}
 	}
 	else {
+		std::cerr
+			<< "Unknown message:"
+			<< std::endl
+			<< msg.to_json().dump(4)
+			<< std::endl;
 		lsp_unimplemented;
 	}
 }
@@ -203,6 +213,14 @@ completion_item_kind to_completion_item_kind(i32 num) {
 	lsp_assert(num >= 1 && num <= 25);
 
 	return completion_item_kind(num);
+}
+
+// TextDocumentSyncKind
+
+text_document_sync_kind to_text_document_sync_kind(i32 num) {
+	lsp_assert(num >= 0 && num <= 2);
+
+	return text_document_sync_kind(num);
 }
 
 // WorkspaceFolder
@@ -591,6 +609,65 @@ text_document_client_capabilities::folding_range_t::from_json(json const& js) {
 		.range_limit(jw.opt<i32>("rangeLimit"))
 		.line_folding_only(def(jw.opt<bool>("lineFoldingOnly"), true))
 		;
+}
+
+// InitializeResult
+
+json initialize_result::to_json() const {
+	return jbuild()
+		.set("capabilities", capabilities())
+		.get();
+}
+
+// ServerCapabilities
+
+json server_capabilities::to_json() const {
+	return jbuild()
+		// XXX(LPeter1997): Implement
+		.set("textDocumentSync", text_document_sync()/* XXX */)
+		.set("hoverProvider", hover_provider()/* XXX */)
+		.set("completionProvider", completion_provider()/* XXX */)
+		.set("signatureHelpProvider", signature_help_provider()/* XXX */)
+		.set("definitionProvider", definition_provider()/* XXX */)
+		.set("typeDefinitionProvider", type_definition_provider()/* XXX */)
+		.set("implementationProvider", implementation_provider()/* XXX */)
+		.set("referencesProvider", references_provider()/* XXX */)
+		.set("documentHighlightProvider", document_highlight_provider()/* XXX */)
+		.set("documentSymbolProvider", document_symbol_provider()/* XXX */)
+		.set("workspaceSymbolProvider", workspace_symbol_provider()/* XXX */)
+		.set("codeActionProvider", code_action_provider()/* XXX */)
+		.set("codeLensProvider", code_lens_provider()/* XXX */)
+		.set("documentFormattingProvider", document_formatting_provider()/* XXX */)
+		.set("documentRangeFormattingProvider", document_range_formatting_provider()/* XXX */)
+		.set("documentOnTypeFormattingProvider", document_on_type_formatting_provider()/* XXX */)
+		.set("renameProvider", rename_provider()/* XXX */)
+		.set("documentLinkProvider", document_link_provider()/* XXX */)
+		.set("colorProvider", color_provider()/* XXX */)
+		.set("foldingRangeProvider", folding_range_provider()/* XXX */)
+		.set("executeCommandProvider", execute_command_provider()/* XXX */)
+		.set("workspace", workspace()/* XXX */)
+		.set("experimental", experimental()/* XXX */)
+		.get();
+}
+
+// TextDocumentSyncOptions
+
+json text_document_sync_options::to_json() const {
+	return jbuild()
+		.set("openClose", open_close())
+		.set("change", i32(change()))
+		.set("willSave", will_save())
+		.set("willSaveWaitUntil", will_save_wait_until())
+		.set("save", save().to_json())
+		.get();
+}
+
+// SaveOptions
+
+json save_options::to_json() const {
+	return jbuild()
+		.set("includeText", include_text())
+		.get();
 }
 
 } /* namespace lsp */

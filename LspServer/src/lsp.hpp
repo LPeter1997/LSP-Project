@@ -189,6 +189,15 @@ enum class completion_item_kind {
 };
 
 /**
+ * TextDocumentSyncKind.
+ */
+enum class text_document_sync_kind {
+	none = 0,
+	full = 1,
+	incremental = 2,
+};
+
+/**
  * A WorkspaceFolder.
  */
 struct workspace_folder {
@@ -658,13 +667,75 @@ struct initialize_params {
 };
 
 /**
- * XXX(LPeter1997): TODO
+ * SaveOptions.
+ */
+struct save_options {
+	ctors(save_options);
+
+	json to_json() const;
+
+	named_mem(bool, include_text) = false;
+};
+
+/**
+ * TextDocumentSyncOptions.
+ */
+struct text_document_sync_options {
+	ctors(text_document_sync_options);
+
+	json to_json() const;
+
+	named_mem(bool, open_close) = false;
+	named_mem(text_document_sync_kind, change) = text_document_sync_kind::none;
+	named_mem(bool, will_save) = false;
+	named_mem(bool, will_save_wait_until) = false;
+	named_mem(save_options, save);
+};
+
+/**
+ * ServerCapabilities.
+ */
+struct server_capabilities {
+	ctors(server_capabilities);
+
+	json to_json() const;
+
+	// XXX(LPeter1997): Implement
+	named_mem(/* XXX */, text_document_sync);
+	named_mem(/* XXX */, hover_provider);
+	named_mem(/* XXX */, completion_provider);
+	named_mem(/* XXX */, signature_help_provider);
+	named_mem(/* XXX */, definition_provider);
+	named_mem(/* XXX */, type_definition_provider);
+	named_mem(/* XXX */, implementation_provider);
+	named_mem(/* XXX */, references_provider);
+	named_mem(/* XXX */, document_highlight_provider);
+	named_mem(/* XXX */, document_symbol_provider);
+	named_mem(/* XXX */, workspace_symbol_provider);
+	named_mem(/* XXX */, code_action_provider);
+	named_mem(/* XXX */, code_lens_provider);
+	named_mem(/* XXX */, document_formatting_provider);
+	named_mem(/* XXX */, document_range_formatting_provider);
+	named_mem(/* XXX */, document_on_type_formatting_provider);
+	named_mem(/* XXX */, rename_provider);
+	named_mem(/* XXX */, document_link_provider);
+	named_mem(/* XXX */, color_provider);
+	named_mem(/* XXX */, folding_range_provider);
+	named_mem(/* XXX */, execute_command_provider);
+	named_mem(/* XXX */, workspace);
+	named_mem(/* XXX */, experimental);
+};
+
+/**
+ * InitializeResult.
  */
 struct initialize_result {
-	json to_json() const {
-		// XXX(LPeter1997): implement
-		return json();
-	}
+	ctors(initialize_result);
+
+	json to_json() const;
+
+	// XXX(LPeter1997): Implement
+	named_mem(/* XXX */, capabilities);
 };
 
 #undef named_mem

@@ -4,7 +4,7 @@
  * @author Peter Lenkefi
  * @date 2018-10-27
  * @description This is a wrapper structure for nlohmann's JSON library to make
- * serialization easier.
+ * serialization and de-serialization easier easier.
  */
 
 #ifndef LSP_JWRAP_HPP
@@ -37,6 +37,23 @@ struct jwrap {
 
 private:
 	json const& m_JSON;
+};
+
+struct jbuild {
+	explicit jbuild() = default;
+
+	template <typename T>
+	auto& set(char const* name, T&& val) {
+		m_JSON[name] = std::forward<T>(val);
+		return *this;
+	}
+
+	json get() {
+		return std::move(m_JSON);
+	}
+
+private:
+	json m_JSON;
 };
 
 } /* namespace lsp */
