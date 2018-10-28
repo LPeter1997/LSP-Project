@@ -357,7 +357,7 @@ text_document_client_capabilities text_document_client_capabilities::from_json(j
 		.color_provider(jw.opt("colorProvider") | color_provider_t::from_json)
 		.rename(jw.opt("rename") | rename_t::from_json)
 		.publish_diagnostics(jw.opt("publishDiagnostics") | publish_diagnostics_t::from_json)
-		.folding_range(jw.get("foldingRange") | folding_range_t::from_json)
+		.folding_range(jw.opt("foldingRange") | folding_range_t::from_json)
 		;
 }
 
