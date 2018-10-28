@@ -11,11 +11,10 @@
 
 #include <cstdint>
 #include <cassert>
+#include <functional>
 #include <optional>
-#include <string>
-#include <tuple>
-#include <variant>
-#include <vector>
+#include <type_traits>
+#include <utility>
 #include "json.hpp"
 
 #define lsp_assert(x) assert(x)
@@ -35,24 +34,45 @@ using u16 = std::uint16_t;
 using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 
-using str = std::string;
-
-template <typename T>
-using vec = std::vector<T>;
-
 using json = nlohmann::json;
 
+namespace detail {
+
+template <typename>
+struct is_optional : std::false_type {};
+
 template <typename T>
-using opt = std::optional<T>;
+struct is_optional<std::optional<T>> : std::true_type {};
 
-constexpr auto none = std::nullopt;
+template <typename T>
+inline constexpr bool is_optional_v = is_optional<T>::value;
 
-template <typename... Ts>
-using sum = std::variant<Ts...>;
+} /* namespace detail */
 
-template <typename... Ts>
-using prod = std::tuple<Ts...>;
+// fmap for optional
+template <typename T, typename Fn,
+	typename = std::enable_if_t<detail::is_optional_v<std::decay_t<T>>>>
+auto operator|(T&& opt, Fn fn) {
+	using fn_return_type = std::invoke_result_t<Fn, typename std::decay_t<T>::value_type>;
 
+	if constexpr (detail::is_optional_v<fn_return_type>) {
+		if (opt) {
+			return fn(*std::forward<T>(opt));
+		}
+		else {
+			return std::optional<typename fn_return_type::value_type>();
+		}
+	}
+	else {
+		if (opt) {
+			return std::make_optional(fn(*std::forward<T>(opt)));
+		}
+		else {
+            return std::optional<fn_return_type>();
+		}
+	}
 }
+
+} /* namespace lsp */
 
 #endif /* LSP_COMMON_HPP */

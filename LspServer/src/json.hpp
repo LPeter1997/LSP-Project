@@ -386,6 +386,15 @@ namespace detail
 // helpers //
 /////////////
 
+// Note to maintainers:
+//
+// Every trait in this file expects a non CV-qualified type.
+// The only exceptions are in the 'aliases for detected' section
+// (i.e. those of the form: decltype(T::member_function(std::declval<T>())))
+//
+// In this case, T has to be properly CV-qualified to constraint the function arguments
+// (e.g. to_json(BasicJsonType&, const T&))
+
 template<typename> struct is_basic_json : std::false_type {};
 
 NLOHMANN_BASIC_JSON_TPL_DECLARATION
@@ -427,6 +436,52 @@ using from_json_function = decltype(T::from_json(std::declval<Args>()...));
 
 template <typename T, typename U>
 using get_template_function = decltype(std::declval<T>().template get<U>());
+
+// trait checking if JSONSerializer<T>::from_json(json const&, udt&) exists
+template <typename BasicJsonType, typename T, typename = void>
+struct has_from_json : std::false_type {};
+
+template <typename BasicJsonType, typename T>
+struct has_from_json<BasicJsonType, T,
+           enable_if_t<not is_basic_json<T>::value>>
+{
+    using serializer = typename BasicJsonType::template json_serializer<T, void>;
+
+    static constexpr bool value =
+        is_detected_exact<void, from_json_function, serializer,
+        const BasicJsonType&, T&>::value;
+};
+
+// This trait checks if JSONSerializer<T>::from_json(json const&) exists
+// this overload is used for non-default-constructible user-defined-types
+template <typename BasicJsonType, typename T, typename = void>
+struct has_non_default_from_json : std::false_type {};
+
+template<typename BasicJsonType, typename T>
+struct has_non_default_from_json<BasicJsonType, T, enable_if_t<not is_basic_json<T>::value>>
+{
+    using serializer = typename BasicJsonType::template json_serializer<T, void>;
+
+    static constexpr bool value =
+        is_detected_exact<T, from_json_function, serializer,
+        const BasicJsonType&>::value;
+};
+
+// This trait checks if BasicJsonType::json_serializer<T>::to_json exists
+// Do not evaluate the trait when T is a basic_json type, to avoid template instantiation infinite recursion.
+template <typename BasicJsonType, typename T, typename = void>
+struct has_to_json : std::false_type {};
+
+template <typename BasicJsonType, typename T>
+struct has_to_json<BasicJsonType, T, enable_if_t<not is_basic_json<T>::value>>
+{
+    using serializer = typename BasicJsonType::template json_serializer<T, void>;
+
+    static constexpr bool value =
+        is_detected_exact<void, to_json_function, serializer, BasicJsonType&,
+        T>::value;
+};
+
 
 ///////////////////
 // is_ functions //
@@ -483,6 +538,35 @@ template <typename BasicJsonType, typename CompatibleObjectType>
 struct is_compatible_object_type
     : is_compatible_object_type_impl<BasicJsonType, CompatibleObjectType> {};
 
+template <typename BasicJsonType, typename ConstructibleObjectType,
+          typename = void>
+struct is_constructible_object_type_impl : std::false_type {};
+
+template <typename BasicJsonType, typename ConstructibleObjectType>
+struct is_constructible_object_type_impl <
+    BasicJsonType, ConstructibleObjectType,
+    enable_if_t<is_detected<mapped_type_t, ConstructibleObjectType>::value and
+    is_detected<key_type_t, ConstructibleObjectType>::value >>
+{
+    using object_t = typename BasicJsonType::object_t;
+
+    static constexpr bool value =
+        std::is_constructible<typename ConstructibleObjectType::key_type,
+        typename object_t::key_type>::value and
+        std::is_same<typename object_t::mapped_type,
+        typename ConstructibleObjectType::mapped_type>::value or
+        (has_from_json<BasicJsonType,
+         typename ConstructibleObjectType::mapped_type>::value or
+         has_non_default_from_json <
+         BasicJsonType,
+         typename ConstructibleObjectType::mapped_type >::value);
+};
+
+template <typename BasicJsonType, typename ConstructibleObjectType>
+struct is_constructible_object_type
+    : is_constructible_object_type_impl<BasicJsonType,
+      ConstructibleObjectType> {};
+
 template <typename BasicJsonType, typename CompatibleStringType,
           typename = void>
 struct is_compatible_string_type_impl : std::false_type {};
@@ -497,9 +581,28 @@ struct is_compatible_string_type_impl <
         std::is_constructible<typename BasicJsonType::string_t, CompatibleStringType>::value;
 };
 
-template <typename BasicJsonType, typename CompatibleStringType>
+template <typename BasicJsonType, typename ConstrutibleStringType>
 struct is_compatible_string_type
-    : is_compatible_string_type_impl<BasicJsonType, CompatibleStringType> {};
+    : is_compatible_string_type_impl<BasicJsonType, ConstrutibleStringType> {};
+
+template <typename BasicJsonType, typename ConstrutibleStringType,
+          typename = void>
+struct is_constructible_string_type_impl : std::false_type {};
+
+template <typename BasicJsonType, typename ConstrutibleStringType>
+struct is_constructible_string_type_impl <
+    BasicJsonType, ConstrutibleStringType,
+    enable_if_t<is_detected_exact<typename BasicJsonType::string_t::value_type,
+    value_type_t, ConstrutibleStringType>::value >>
+{
+    static constexpr auto value =
+        std::is_constructible<ConstrutibleStringType,
+        typename BasicJsonType::string_t>::value;
+};
+
+template <typename BasicJsonType, typename ConstrutibleStringType>
+struct is_constructible_string_type
+    : is_constructible_string_type_impl<BasicJsonType, ConstrutibleStringType> {};
 
 template <typename BasicJsonType, typename CompatibleArrayType, typename = void>
 struct is_compatible_array_type_impl : std::false_type {};
@@ -508,17 +611,60 @@ template <typename BasicJsonType, typename CompatibleArrayType>
 struct is_compatible_array_type_impl <
     BasicJsonType, CompatibleArrayType,
     enable_if_t<is_detected<value_type_t, CompatibleArrayType>::value and
-    is_detected<iterator_t, CompatibleArrayType>::value >>
+    is_detected<iterator_t, CompatibleArrayType>::value and
+// This is needed because json_reverse_iterator has a ::iterator type...
+// Therefore it is detected as a CompatibleArrayType.
+// The real fix would be to have an Iterable concept.
+    not is_iterator_traits<
+    std::iterator_traits<CompatibleArrayType>>::value >>
 {
-    // This is needed because json_reverse_iterator has a ::iterator type...
-    // Therefore it is detected as a CompatibleArrayType.
-    // The real fix would be to have an Iterable concept.
-    static constexpr bool value = not is_iterator_traits<std::iterator_traits<CompatibleArrayType>>::value;
+    static constexpr bool value =
+        std::is_constructible<BasicJsonType,
+        typename CompatibleArrayType::value_type>::value;
 };
 
 template <typename BasicJsonType, typename CompatibleArrayType>
 struct is_compatible_array_type
     : is_compatible_array_type_impl<BasicJsonType, CompatibleArrayType> {};
+
+template <typename BasicJsonType, typename ConstructibleArrayType, typename = void>
+struct is_constructible_array_type_impl : std::false_type {};
+
+template <typename BasicJsonType, typename ConstructibleArrayType>
+struct is_constructible_array_type_impl <
+    BasicJsonType, ConstructibleArrayType,
+    enable_if_t<std::is_same<ConstructibleArrayType,
+    typename BasicJsonType::value_type>::value >>
+            : std::true_type {};
+
+template <typename BasicJsonType, typename ConstructibleArrayType>
+struct is_constructible_array_type_impl <
+    BasicJsonType, ConstructibleArrayType,
+    enable_if_t<not std::is_same<ConstructibleArrayType,
+    typename BasicJsonType::value_type>::value and
+    is_detected<value_type_t, ConstructibleArrayType>::value and
+    is_detected<iterator_t, ConstructibleArrayType>::value and
+    is_complete_type<
+    detected_t<value_type_t, ConstructibleArrayType>>::value >>
+{
+    static constexpr bool value =
+        // This is needed because json_reverse_iterator has a ::iterator type,
+        // furthermore, std::back_insert_iterator (and other iterators) have a base class `iterator`...
+        // Therefore it is detected as a ConstructibleArrayType.
+        // The real fix would be to have an Iterable concept.
+        not is_iterator_traits <
+        std::iterator_traits<ConstructibleArrayType >>::value and
+
+        (std::is_same<typename ConstructibleArrayType::value_type, typename BasicJsonType::array_t::value_type>::value or
+         has_from_json<BasicJsonType,
+         typename ConstructibleArrayType::value_type>::value or
+         has_non_default_from_json <
+         BasicJsonType, typename ConstructibleArrayType::value_type >::value);
+};
+
+template <typename BasicJsonType, typename ConstructibleArrayType>
+struct is_constructible_array_type
+    : is_constructible_array_type_impl<BasicJsonType, ConstructibleArrayType> {};
 
 template <typename RealIntegerType, typename CompatibleNumberIntegerType,
           typename = void>
@@ -546,51 +692,6 @@ template <typename RealIntegerType, typename CompatibleNumberIntegerType>
 struct is_compatible_integer_type
     : is_compatible_integer_type_impl<RealIntegerType,
       CompatibleNumberIntegerType> {};
-
-// trait checking if JSONSerializer<T>::from_json(json const&, udt&) exists
-template <typename BasicJsonType, typename T, typename = void>
-struct has_from_json : std::false_type {};
-
-template <typename BasicJsonType, typename T>
-struct has_from_json<BasicJsonType, T,
-           enable_if_t<not is_basic_json<T>::value>>
-{
-    using serializer = typename BasicJsonType::template json_serializer<T, void>;
-
-    static constexpr bool value =
-        is_detected_exact<void, from_json_function, serializer,
-        const BasicJsonType&, T&>::value;
-};
-
-// This trait checks if JSONSerializer<T>::from_json(json const&) exists
-// this overload is used for non-default-constructible user-defined-types
-template <typename BasicJsonType, typename T, typename = void>
-struct has_non_default_from_json : std::false_type {};
-
-template<typename BasicJsonType, typename T>
-struct has_non_default_from_json<BasicJsonType, T, enable_if_t<not is_basic_json<T>::value>>
-{
-    using serializer = typename BasicJsonType::template json_serializer<T, void>;
-
-    static constexpr bool value =
-        is_detected_exact<T, from_json_function, serializer,
-        const BasicJsonType&>::value;
-};
-
-// This trait checks if BasicJsonType::json_serializer<T>::to_json exists
-// Do not evaluate the trait when T is a basic_json type, to avoid template instantiation infinite recursion.
-template <typename BasicJsonType, typename T, typename = void>
-struct has_to_json : std::false_type {};
-
-template <typename BasicJsonType, typename T>
-struct has_to_json<BasicJsonType, T, enable_if_t<not is_basic_json<T>::value>>
-{
-    using serializer = typename BasicJsonType::template json_serializer<T, void>;
-
-    static constexpr bool value =
-        is_detected_exact<void, to_json_function, serializer, BasicJsonType&,
-        T>::value;
-};
 
 template <typename BasicJsonType, typename CompatibleType, typename = void>
 struct is_compatible_type_impl: std::false_type {};
@@ -1156,13 +1257,13 @@ void from_json(const BasicJsonType& j, typename BasicJsonType::string_t& s)
 }
 
 template <
-    typename BasicJsonType, typename CompatibleStringType,
+    typename BasicJsonType, typename ConstructibleStringType,
     enable_if_t <
-        is_compatible_string_type<BasicJsonType, CompatibleStringType>::value and
+        is_constructible_string_type<BasicJsonType, ConstructibleStringType>::value and
         not std::is_same<typename BasicJsonType::string_t,
-                         CompatibleStringType>::value,
+                         ConstructibleStringType>::value,
         int > = 0 >
-void from_json(const BasicJsonType& j, CompatibleStringType& s)
+void from_json(const BasicJsonType& j, ConstructibleStringType& s)
 {
     if (JSON_UNLIKELY(not j.is_string()))
     {
@@ -1245,11 +1346,11 @@ auto from_json_array_impl(const BasicJsonType& j, std::array<T, N>& arr,
     }
 }
 
-template<typename BasicJsonType, typename CompatibleArrayType>
-auto from_json_array_impl(const BasicJsonType& j, CompatibleArrayType& arr, priority_tag<1> /*unused*/)
+template<typename BasicJsonType, typename ConstructibleArrayType>
+auto from_json_array_impl(const BasicJsonType& j, ConstructibleArrayType& arr, priority_tag<1> /*unused*/)
 -> decltype(
-    arr.reserve(std::declval<typename CompatibleArrayType::size_type>()),
-    j.template get<typename CompatibleArrayType::value_type>(),
+    arr.reserve(std::declval<typename ConstructibleArrayType::size_type>()),
+    j.template get<typename ConstructibleArrayType::value_type>(),
     void())
 {
     using std::end;
@@ -1260,12 +1361,12 @@ auto from_json_array_impl(const BasicJsonType& j, CompatibleArrayType& arr, prio
     {
         // get<BasicJsonType>() returns *this, this won't call a from_json
         // method when value_type is BasicJsonType
-        return i.template get<typename CompatibleArrayType::value_type>();
+        return i.template get<typename ConstructibleArrayType::value_type>();
     });
 }
 
-template <typename BasicJsonType, typename CompatibleArrayType>
-void from_json_array_impl(const BasicJsonType& j, CompatibleArrayType& arr,
+template <typename BasicJsonType, typename ConstructibleArrayType>
+void from_json_array_impl(const BasicJsonType& j, ConstructibleArrayType& arr,
                           priority_tag<0> /*unused*/)
 {
     using std::end;
@@ -1276,21 +1377,21 @@ void from_json_array_impl(const BasicJsonType& j, CompatibleArrayType& arr,
     {
         // get<BasicJsonType>() returns *this, this won't call a from_json
         // method when value_type is BasicJsonType
-        return i.template get<typename CompatibleArrayType::value_type>();
+        return i.template get<typename ConstructibleArrayType::value_type>();
     });
 }
 
-template <typename BasicJsonType, typename CompatibleArrayType,
+template <typename BasicJsonType, typename ConstructibleArrayType,
           enable_if_t <
-              is_compatible_array_type<BasicJsonType, CompatibleArrayType>::value and
-              not is_compatible_object_type<BasicJsonType, CompatibleArrayType>::value and
-              not is_compatible_string_type<BasicJsonType, CompatibleArrayType>::value and
-              not is_basic_json<CompatibleArrayType>::value,
+              is_constructible_array_type<BasicJsonType, ConstructibleArrayType>::value and
+              not is_constructible_object_type<BasicJsonType, ConstructibleArrayType>::value and
+              not is_constructible_string_type<BasicJsonType, ConstructibleArrayType>::value and
+              not is_basic_json<ConstructibleArrayType>::value,
               int > = 0 >
 
-auto from_json(const BasicJsonType& j, CompatibleArrayType& arr)
+auto from_json(const BasicJsonType& j, ConstructibleArrayType& arr)
 -> decltype(from_json_array_impl(j, arr, priority_tag<3> {}),
-j.template get<typename CompatibleArrayType::value_type>(),
+j.template get<typename ConstructibleArrayType::value_type>(),
 void())
 {
     if (JSON_UNLIKELY(not j.is_array()))
@@ -1302,9 +1403,9 @@ void())
     from_json_array_impl(j, arr, priority_tag<3> {});
 }
 
-template<typename BasicJsonType, typename CompatibleObjectType,
-         enable_if_t<is_compatible_object_type<BasicJsonType, CompatibleObjectType>::value, int> = 0>
-void from_json(const BasicJsonType& j, CompatibleObjectType& obj)
+template<typename BasicJsonType, typename ConstructibleObjectType,
+         enable_if_t<is_constructible_object_type<BasicJsonType, ConstructibleObjectType>::value, int> = 0>
+void from_json(const BasicJsonType& j, ConstructibleObjectType& obj)
 {
     if (JSON_UNLIKELY(not j.is_object()))
     {
@@ -1312,13 +1413,13 @@ void from_json(const BasicJsonType& j, CompatibleObjectType& obj)
     }
 
     auto inner_object = j.template get_ptr<const typename BasicJsonType::object_t*>();
-    using value_type = typename CompatibleObjectType::value_type;
+    using value_type = typename ConstructibleObjectType::value_type;
     std::transform(
         inner_object->begin(), inner_object->end(),
         std::inserter(obj, obj.begin()),
         [](typename BasicJsonType::object_t::value_type const & p)
     {
-        return value_type(p.first, p.second.template get<typename CompatibleObjectType::mapped_type>());
+        return value_type(p.first, p.second.template get<typename ConstructibleObjectType::mapped_type>());
     });
 }
 
@@ -6297,7 +6398,8 @@ class binary_reader
 
             if (JSON_UNLIKELY(current != std::char_traits<char>::eof()))
             {
-                return sax->parse_error(chars_read, get_token_string(), parse_error::create(110, chars_read, "expected end of input"));
+                return sax->parse_error(chars_read, get_token_string(),
+                                        parse_error::create(110, chars_read, exception_message(format, "expected end of input; last byte: 0x" + get_token_string(), "value")));
             }
         }
 
@@ -6330,7 +6432,7 @@ class binary_reader
         {
             // EOF
             case std::char_traits<char>::eof():
-                return unexpect_eof();
+                return unexpect_eof(input_format_t::cbor, "value");
 
             // Integer 0x00..0x17 (0..23)
             case 0x00:
@@ -6362,25 +6464,25 @@ class binary_reader
             case 0x18: // Unsigned integer (one-byte uint8_t follows)
             {
                 uint8_t number;
-                return get_number(number) and sax->number_unsigned(number);
+                return get_number(input_format_t::cbor, number) and sax->number_unsigned(number);
             }
 
             case 0x19: // Unsigned integer (two-byte uint16_t follows)
             {
                 uint16_t number;
-                return get_number(number) and sax->number_unsigned(number);
+                return get_number(input_format_t::cbor, number) and sax->number_unsigned(number);
             }
 
             case 0x1A: // Unsigned integer (four-byte uint32_t follows)
             {
                 uint32_t number;
-                return get_number(number) and sax->number_unsigned(number);
+                return get_number(input_format_t::cbor, number) and sax->number_unsigned(number);
             }
 
             case 0x1B: // Unsigned integer (eight-byte uint64_t follows)
             {
                 uint64_t number;
-                return get_number(number) and sax->number_unsigned(number);
+                return get_number(input_format_t::cbor, number) and sax->number_unsigned(number);
             }
 
             // Negative integer -1-0x00..-1-0x17 (-1..-24)
@@ -6413,25 +6515,25 @@ class binary_reader
             case 0x38: // Negative integer (one-byte uint8_t follows)
             {
                 uint8_t number;
-                return get_number(number) and sax->number_integer(static_cast<number_integer_t>(-1) - number);
+                return get_number(input_format_t::cbor, number) and sax->number_integer(static_cast<number_integer_t>(-1) - number);
             }
 
             case 0x39: // Negative integer -1-n (two-byte uint16_t follows)
             {
                 uint16_t number;
-                return get_number(number) and sax->number_integer(static_cast<number_integer_t>(-1) - number);
+                return get_number(input_format_t::cbor, number) and sax->number_integer(static_cast<number_integer_t>(-1) - number);
             }
 
             case 0x3A: // Negative integer -1-n (four-byte uint32_t follows)
             {
                 uint32_t number;
-                return get_number(number) and sax->number_integer(static_cast<number_integer_t>(-1) - number);
+                return get_number(input_format_t::cbor, number) and sax->number_integer(static_cast<number_integer_t>(-1) - number);
             }
 
             case 0x3B: // Negative integer -1-n (eight-byte uint64_t follows)
             {
                 uint64_t number;
-                return get_number(number) and sax->number_integer(static_cast<number_integer_t>(-1)
+                return get_number(input_format_t::cbor, number) and sax->number_integer(static_cast<number_integer_t>(-1)
                         - static_cast<number_integer_t>(number));
             }
 
@@ -6500,25 +6602,25 @@ class binary_reader
             case 0x98: // array (one-byte uint8_t for n follows)
             {
                 uint8_t len;
-                return get_number(len) and get_cbor_array(static_cast<std::size_t>(len));
+                return get_number(input_format_t::cbor, len) and get_cbor_array(static_cast<std::size_t>(len));
             }
 
             case 0x99: // array (two-byte uint16_t for n follow)
             {
                 uint16_t len;
-                return get_number(len) and get_cbor_array(static_cast<std::size_t>(len));
+                return get_number(input_format_t::cbor, len) and get_cbor_array(static_cast<std::size_t>(len));
             }
 
             case 0x9A: // array (four-byte uint32_t for n follow)
             {
                 uint32_t len;
-                return get_number(len) and get_cbor_array(static_cast<std::size_t>(len));
+                return get_number(input_format_t::cbor, len) and get_cbor_array(static_cast<std::size_t>(len));
             }
 
             case 0x9B: // array (eight-byte uint64_t for n follow)
             {
                 uint64_t len;
-                return get_number(len) and get_cbor_array(static_cast<std::size_t>(len));
+                return get_number(input_format_t::cbor, len) and get_cbor_array(static_cast<std::size_t>(len));
             }
 
             case 0x9F: // array (indefinite length)
@@ -6554,25 +6656,25 @@ class binary_reader
             case 0xB8: // map (one-byte uint8_t for n follows)
             {
                 uint8_t len;
-                return get_number(len) and get_cbor_object(static_cast<std::size_t>(len));
+                return get_number(input_format_t::cbor, len) and get_cbor_object(static_cast<std::size_t>(len));
             }
 
             case 0xB9: // map (two-byte uint16_t for n follow)
             {
                 uint16_t len;
-                return get_number(len) and get_cbor_object(static_cast<std::size_t>(len));
+                return get_number(input_format_t::cbor, len) and get_cbor_object(static_cast<std::size_t>(len));
             }
 
             case 0xBA: // map (four-byte uint32_t for n follow)
             {
                 uint32_t len;
-                return get_number(len) and get_cbor_object(static_cast<std::size_t>(len));
+                return get_number(input_format_t::cbor, len) and get_cbor_object(static_cast<std::size_t>(len));
             }
 
             case 0xBB: // map (eight-byte uint64_t for n follow)
             {
                 uint64_t len;
-                return get_number(len) and get_cbor_object(static_cast<std::size_t>(len));
+                return get_number(input_format_t::cbor, len) and get_cbor_object(static_cast<std::size_t>(len));
             }
 
             case 0xBF: // map (indefinite length)
@@ -6590,12 +6692,12 @@ class binary_reader
             case 0xF9: // Half-Precision Float (two-byte IEEE 754)
             {
                 const int byte1_raw = get();
-                if (JSON_UNLIKELY(not unexpect_eof()))
+                if (JSON_UNLIKELY(not unexpect_eof(input_format_t::cbor, "number")))
                 {
                     return false;
                 }
                 const int byte2_raw = get();
-                if (JSON_UNLIKELY(not unexpect_eof()))
+                if (JSON_UNLIKELY(not unexpect_eof(input_format_t::cbor, "number")))
                 {
                     return false;
                 }
@@ -6638,19 +6740,19 @@ class binary_reader
             case 0xFA: // Single-Precision Float (four-byte IEEE 754)
             {
                 float number;
-                return get_number(number) and sax->number_float(static_cast<number_float_t>(number), "");
+                return get_number(input_format_t::cbor, number) and sax->number_float(static_cast<number_float_t>(number), "");
             }
 
             case 0xFB: // Double-Precision Float (eight-byte IEEE 754)
             {
                 double number;
-                return get_number(number) and sax->number_float(static_cast<number_float_t>(number), "");
+                return get_number(input_format_t::cbor, number) and sax->number_float(static_cast<number_float_t>(number), "");
             }
 
             default: // anything else (0xFF is handled inside the other types)
             {
                 auto last_token = get_token_string();
-                return sax->parse_error(chars_read, last_token, parse_error::create(112, chars_read, "error reading CBOR; last byte: 0x" + last_token));
+                return sax->parse_error(chars_read, last_token, parse_error::create(112, chars_read, exception_message(input_format_t::cbor, "invalid byte: 0x" + last_token, "value")));
             }
         }
     }
@@ -6664,7 +6766,7 @@ class binary_reader
         {
             // EOF
             case std::char_traits<char>::eof():
-                return unexpect_eof();
+                return unexpect_eof(input_format_t::msgpack, "value");
 
             // positive fixint
             case 0x00:
@@ -6885,61 +6987,61 @@ class binary_reader
             case 0xCA: // float 32
             {
                 float number;
-                return get_number(number) and sax->number_float(static_cast<number_float_t>(number), "");
+                return get_number(input_format_t::msgpack, number) and sax->number_float(static_cast<number_float_t>(number), "");
             }
 
             case 0xCB: // float 64
             {
                 double number;
-                return get_number(number) and sax->number_float(static_cast<number_float_t>(number), "");
+                return get_number(input_format_t::msgpack, number) and sax->number_float(static_cast<number_float_t>(number), "");
             }
 
             case 0xCC: // uint 8
             {
                 uint8_t number;
-                return get_number(number) and sax->number_unsigned(number);
+                return get_number(input_format_t::msgpack, number) and sax->number_unsigned(number);
             }
 
             case 0xCD: // uint 16
             {
                 uint16_t number;
-                return get_number(number) and sax->number_unsigned(number);
+                return get_number(input_format_t::msgpack, number) and sax->number_unsigned(number);
             }
 
             case 0xCE: // uint 32
             {
                 uint32_t number;
-                return get_number(number) and sax->number_unsigned(number);
+                return get_number(input_format_t::msgpack, number) and sax->number_unsigned(number);
             }
 
             case 0xCF: // uint 64
             {
                 uint64_t number;
-                return get_number(number) and sax->number_unsigned(number);
+                return get_number(input_format_t::msgpack, number) and sax->number_unsigned(number);
             }
 
             case 0xD0: // int 8
             {
                 int8_t number;
-                return get_number(number) and sax->number_integer(number);
+                return get_number(input_format_t::msgpack, number) and sax->number_integer(number);
             }
 
             case 0xD1: // int 16
             {
                 int16_t number;
-                return get_number(number) and sax->number_integer(number);
+                return get_number(input_format_t::msgpack, number) and sax->number_integer(number);
             }
 
             case 0xD2: // int 32
             {
                 int32_t number;
-                return get_number(number) and sax->number_integer(number);
+                return get_number(input_format_t::msgpack, number) and sax->number_integer(number);
             }
 
             case 0xD3: // int 64
             {
                 int64_t number;
-                return get_number(number) and sax->number_integer(number);
+                return get_number(input_format_t::msgpack, number) and sax->number_integer(number);
             }
 
             case 0xD9: // str 8
@@ -6953,25 +7055,25 @@ class binary_reader
             case 0xDC: // array 16
             {
                 uint16_t len;
-                return get_number(len) and get_msgpack_array(static_cast<std::size_t>(len));
+                return get_number(input_format_t::msgpack, len) and get_msgpack_array(static_cast<std::size_t>(len));
             }
 
             case 0xDD: // array 32
             {
                 uint32_t len;
-                return get_number(len) and get_msgpack_array(static_cast<std::size_t>(len));
+                return get_number(input_format_t::msgpack, len) and get_msgpack_array(static_cast<std::size_t>(len));
             }
 
             case 0xDE: // map 16
             {
                 uint16_t len;
-                return get_number(len) and get_msgpack_object(static_cast<std::size_t>(len));
+                return get_number(input_format_t::msgpack, len) and get_msgpack_object(static_cast<std::size_t>(len));
             }
 
             case 0xDF: // map 32
             {
                 uint32_t len;
-                return get_number(len) and get_msgpack_object(static_cast<std::size_t>(len));
+                return get_number(input_format_t::msgpack, len) and get_msgpack_object(static_cast<std::size_t>(len));
             }
 
             // negative fixint
@@ -7012,7 +7114,7 @@ class binary_reader
             default: // anything else
             {
                 auto last_token = get_token_string();
-                return sax->parse_error(chars_read, last_token, parse_error::create(112, chars_read, "error reading MessagePack; last byte: 0x" + last_token));
+                return sax->parse_error(chars_read, last_token, parse_error::create(112, chars_read, exception_message(input_format_t::msgpack, "invalid byte: 0x" + last_token, "value")));
             }
         }
     }
@@ -7062,6 +7164,7 @@ class binary_reader
     @brief read a number from the input
 
     @tparam NumberType the type of the number
+    @param[in] format   the current format (for diagnostics)
     @param[out] result  number of type @a NumberType
 
     @return whether conversion completed
@@ -7071,14 +7174,14 @@ class binary_reader
           (big endian) and therefore need reordering on little endian systems.
     */
     template<typename NumberType>
-    bool get_number(NumberType& result)
+    bool get_number(const input_format_t format, NumberType& result)
     {
         // step 1: read input into array with system's byte order
         std::array<uint8_t, sizeof(NumberType)> vec;
         for (std::size_t i = 0; i < sizeof(NumberType); ++i)
         {
             get();
-            if (JSON_UNLIKELY(not unexpect_eof()))
+            if (JSON_UNLIKELY(not unexpect_eof(format, "number")))
             {
                 return false;
             }
@@ -7103,8 +7206,9 @@ class binary_reader
     @brief create a string by reading characters from the input
 
     @tparam NumberType the type of the number
+    @param[in] format the current format (for diagnostics)
     @param[in] len number of characters to read
-    @param[out] string created by reading @a len bytes
+    @param[out] result string created by reading @a len bytes
 
     @return whether string creation completed
 
@@ -7113,13 +7217,13 @@ class binary_reader
           the input before we run out of string memory.
     */
     template<typename NumberType>
-    bool get_string(const NumberType len, string_t& result)
+    bool get_string(const input_format_t format, const NumberType len, string_t& result)
     {
         bool success = true;
-        std::generate_n(std::back_inserter(result), len, [this, &success]()
+        std::generate_n(std::back_inserter(result), len, [this, &success, &format]()
         {
             get();
-            if (JSON_UNLIKELY(not unexpect_eof()))
+            if (JSON_UNLIKELY(not unexpect_eof(format, "string")))
             {
                 success = false;
             }
@@ -7141,7 +7245,7 @@ class binary_reader
     */
     bool get_cbor_string(string_t& result)
     {
-        if (JSON_UNLIKELY(not unexpect_eof()))
+        if (JSON_UNLIKELY(not unexpect_eof(input_format_t::cbor, "string")))
         {
             return false;
         }
@@ -7174,31 +7278,31 @@ class binary_reader
             case 0x76:
             case 0x77:
             {
-                return get_string(current & 0x1F, result);
+                return get_string(input_format_t::cbor, current & 0x1F, result);
             }
 
             case 0x78: // UTF-8 string (one-byte uint8_t for n follows)
             {
                 uint8_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::cbor, len) and get_string(input_format_t::cbor, len, result);
             }
 
             case 0x79: // UTF-8 string (two-byte uint16_t for n follow)
             {
                 uint16_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::cbor, len) and get_string(input_format_t::cbor, len, result);
             }
 
             case 0x7A: // UTF-8 string (four-byte uint32_t for n follow)
             {
                 uint32_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::cbor, len) and get_string(input_format_t::cbor, len, result);
             }
 
             case 0x7B: // UTF-8 string (eight-byte uint64_t for n follow)
             {
                 uint64_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::cbor, len) and get_string(input_format_t::cbor, len, result);
             }
 
             case 0x7F: // UTF-8 string (indefinite length)
@@ -7218,7 +7322,7 @@ class binary_reader
             default:
             {
                 auto last_token = get_token_string();
-                return sax->parse_error(chars_read, last_token, parse_error::create(113, chars_read, "expected a CBOR string; last byte: 0x" + last_token));
+                return sax->parse_error(chars_read, last_token, parse_error::create(113, chars_read, exception_message(input_format_t::cbor, "expected length specification (0x60-0x7B) or indefinite string type (0x7F); last byte: 0x" + last_token, "string")));
             }
         }
     }
@@ -7321,7 +7425,7 @@ class binary_reader
     */
     bool get_msgpack_string(string_t& result)
     {
-        if (JSON_UNLIKELY(not unexpect_eof()))
+        if (JSON_UNLIKELY(not unexpect_eof(input_format_t::msgpack, "string")))
         {
             return false;
         }
@@ -7362,31 +7466,31 @@ class binary_reader
             case 0xBE:
             case 0xBF:
             {
-                return get_string(current & 0x1F, result);
+                return get_string(input_format_t::msgpack, current & 0x1F, result);
             }
 
             case 0xD9: // str 8
             {
                 uint8_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::msgpack, len) and get_string(input_format_t::msgpack, len, result);
             }
 
             case 0xDA: // str 16
             {
                 uint16_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::msgpack, len) and get_string(input_format_t::msgpack, len, result);
             }
 
             case 0xDB: // str 32
             {
                 uint32_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::msgpack, len) and get_string(input_format_t::msgpack, len, result);
             }
 
             default:
             {
                 auto last_token = get_token_string();
-                return sax->parse_error(chars_read, last_token, parse_error::create(113, chars_read, "expected a MessagePack string; last byte: 0x" + last_token));
+                return sax->parse_error(chars_read, last_token, parse_error::create(113, chars_read, exception_message(input_format_t::msgpack, "expected length specification (0xA0-0xBF, 0xD9-0xDB); last byte: 0x" + last_token, "string")));
             }
         }
     }
@@ -7464,7 +7568,7 @@ class binary_reader
             get();  // TODO: may we ignore N here?
         }
 
-        if (JSON_UNLIKELY(not unexpect_eof()))
+        if (JSON_UNLIKELY(not unexpect_eof(input_format_t::ubjson, "value")))
         {
             return false;
         }
@@ -7474,36 +7578,36 @@ class binary_reader
             case 'U':
             {
                 uint8_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::ubjson, len) and get_string(input_format_t::ubjson, len, result);
             }
 
             case 'i':
             {
                 int8_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::ubjson, len) and get_string(input_format_t::ubjson, len, result);
             }
 
             case 'I':
             {
                 int16_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::ubjson, len) and get_string(input_format_t::ubjson, len, result);
             }
 
             case 'l':
             {
                 int32_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::ubjson, len) and get_string(input_format_t::ubjson, len, result);
             }
 
             case 'L':
             {
                 int64_t len;
-                return get_number(len) and get_string(len, result);
+                return get_number(input_format_t::ubjson, len) and get_string(input_format_t::ubjson, len, result);
             }
 
             default:
                 auto last_token = get_token_string();
-                return sax->parse_error(chars_read, last_token, parse_error::create(113, chars_read, "expected a UBJSON string; last byte: 0x" + last_token));
+                return sax->parse_error(chars_read, last_token, parse_error::create(113, chars_read, exception_message(input_format_t::ubjson, "expected length type specification (U, i, I, l, L); last byte: 0x" + last_token, "string")));
         }
     }
 
@@ -7518,7 +7622,7 @@ class binary_reader
             case 'U':
             {
                 uint8_t number;
-                if (JSON_UNLIKELY(not get_number(number)))
+                if (JSON_UNLIKELY(not get_number(input_format_t::ubjson, number)))
                 {
                     return false;
                 }
@@ -7529,7 +7633,7 @@ class binary_reader
             case 'i':
             {
                 int8_t number;
-                if (JSON_UNLIKELY(not get_number(number)))
+                if (JSON_UNLIKELY(not get_number(input_format_t::ubjson, number)))
                 {
                     return false;
                 }
@@ -7540,7 +7644,7 @@ class binary_reader
             case 'I':
             {
                 int16_t number;
-                if (JSON_UNLIKELY(not get_number(number)))
+                if (JSON_UNLIKELY(not get_number(input_format_t::ubjson, number)))
                 {
                     return false;
                 }
@@ -7551,7 +7655,7 @@ class binary_reader
             case 'l':
             {
                 int32_t number;
-                if (JSON_UNLIKELY(not get_number(number)))
+                if (JSON_UNLIKELY(not get_number(input_format_t::ubjson, number)))
                 {
                     return false;
                 }
@@ -7562,7 +7666,7 @@ class binary_reader
             case 'L':
             {
                 int64_t number;
-                if (JSON_UNLIKELY(not get_number(number)))
+                if (JSON_UNLIKELY(not get_number(input_format_t::ubjson, number)))
                 {
                     return false;
                 }
@@ -7573,7 +7677,7 @@ class binary_reader
             default:
             {
                 auto last_token = get_token_string();
-                return sax->parse_error(chars_read, last_token, parse_error::create(113, chars_read, "byte after '#' must denote a number type; last byte: 0x" + last_token));
+                return sax->parse_error(chars_read, last_token, parse_error::create(113, chars_read, exception_message(input_format_t::ubjson, "expected length type specification (U, i, I, l, L) after '#'; last byte: 0x" + last_token, "size")));
             }
         }
     }
@@ -7598,7 +7702,7 @@ class binary_reader
         if (current == '$')
         {
             result.second = get();  // must not ignore 'N', because 'N' maybe the type
-            if (JSON_UNLIKELY(not unexpect_eof()))
+            if (JSON_UNLIKELY(not unexpect_eof(input_format_t::ubjson, "type")))
             {
                 return false;
             }
@@ -7606,12 +7710,12 @@ class binary_reader
             get_ignore_noop();
             if (JSON_UNLIKELY(current != '#'))
             {
-                if (JSON_UNLIKELY(not unexpect_eof()))
+                if (JSON_UNLIKELY(not unexpect_eof(input_format_t::ubjson, "value")))
                 {
                     return false;
                 }
                 auto last_token = get_token_string();
-                return sax->parse_error(chars_read, last_token, parse_error::create(112, chars_read, "expected '#' after UBJSON type information; last byte: 0x" + last_token));
+                return sax->parse_error(chars_read, last_token, parse_error::create(112, chars_read, exception_message(input_format_t::ubjson, "expected '#' after type information; last byte: 0x" + last_token, "size")));
             }
 
             return get_ubjson_size_value(result.first);
@@ -7632,7 +7736,7 @@ class binary_reader
         switch (prefix)
         {
             case std::char_traits<char>::eof():  // EOF
-                return unexpect_eof();
+                return unexpect_eof(input_format_t::ubjson, "value");
 
             case 'T':  // true
                 return sax->boolean(true);
@@ -7645,56 +7749,56 @@ class binary_reader
             case 'U':
             {
                 uint8_t number;
-                return get_number(number) and sax->number_unsigned(number);
+                return get_number(input_format_t::ubjson, number) and sax->number_unsigned(number);
             }
 
             case 'i':
             {
                 int8_t number;
-                return get_number(number) and sax->number_integer(number);
+                return get_number(input_format_t::ubjson, number) and sax->number_integer(number);
             }
 
             case 'I':
             {
                 int16_t number;
-                return get_number(number) and sax->number_integer(number);
+                return get_number(input_format_t::ubjson, number) and sax->number_integer(number);
             }
 
             case 'l':
             {
                 int32_t number;
-                return get_number(number) and sax->number_integer(number);
+                return get_number(input_format_t::ubjson, number) and sax->number_integer(number);
             }
 
             case 'L':
             {
                 int64_t number;
-                return get_number(number) and sax->number_integer(number);
+                return get_number(input_format_t::ubjson, number) and sax->number_integer(number);
             }
 
             case 'd':
             {
                 float number;
-                return get_number(number) and sax->number_float(static_cast<number_float_t>(number), "");
+                return get_number(input_format_t::ubjson, number) and sax->number_float(static_cast<number_float_t>(number), "");
             }
 
             case 'D':
             {
                 double number;
-                return get_number(number) and sax->number_float(static_cast<number_float_t>(number), "");
+                return get_number(input_format_t::ubjson, number) and sax->number_float(static_cast<number_float_t>(number), "");
             }
 
             case 'C':  // char
             {
                 get();
-                if (JSON_UNLIKELY(not unexpect_eof()))
+                if (JSON_UNLIKELY(not unexpect_eof(input_format_t::ubjson, "char")))
                 {
                     return false;
                 }
                 if (JSON_UNLIKELY(current > 127))
                 {
                     auto last_token = get_token_string();
-                    return sax->parse_error(chars_read, last_token, parse_error::create(113, chars_read, "byte after 'C' must be in range 0x00..0x7F; last byte: 0x" + last_token));
+                    return sax->parse_error(chars_read, last_token, parse_error::create(113, chars_read, exception_message(input_format_t::ubjson, "byte after 'C' must be in range 0x00..0x7F; last byte: 0x" + last_token, "char")));
                 }
                 string_t s(1, static_cast<char>(current));
                 return sax->string(s);
@@ -7715,7 +7819,7 @@ class binary_reader
             default: // anything else
             {
                 auto last_token = get_token_string();
-                return sax->parse_error(chars_read, last_token, parse_error::create(112, chars_read, "error reading UBJSON; last byte: 0x" + last_token));
+                return sax->parse_error(chars_read, last_token, parse_error::create(112, chars_read, exception_message(input_format_t::ubjson, "invalid byte: 0x" + last_token, "value")));
             }
         }
     }
@@ -7858,13 +7962,16 @@ class binary_reader
     }
 
     /*!
+    @param[in] format   the current format (for diagnostics)
+    @param[in] context  further context information (for diagnostics)
     @return whether the last read character is not EOF
     */
-    bool unexpect_eof() const
+    bool unexpect_eof(const input_format_t format, const char* context) const
     {
         if (JSON_UNLIKELY(current == std::char_traits<char>::eof()))
         {
-            return sax->parse_error(chars_read, "<end of file>", parse_error::create(110, chars_read, "unexpected end of input"));
+            return sax->parse_error(chars_read, "<end of file>",
+                                    parse_error::create(110, chars_read, exception_message(format, "unexpected end of input", context)));
         }
         return true;
     }
@@ -7880,6 +7987,41 @@ class binary_reader
     }
 
   private:
+    /*!
+    @param[in] format   the current format
+    @param[in] detail   a detailed error message
+    @param[in] context  further contect information
+    @return a message string to use in the parse_error exceptions
+    */
+    std::string exception_message(const input_format_t format,
+                                  const std::string& detail,
+                                  const std::string& context) const
+    {
+        std::string error_msg = "syntax error while parsing ";
+
+        switch (format)
+        {
+            case input_format_t::cbor:
+                error_msg += "CBOR";
+                break;
+
+            case input_format_t::msgpack:
+                error_msg += "MessagePack";
+                break;
+
+            case input_format_t::ubjson:
+                error_msg += "UBJSON";
+                break;
+
+            // LCOV_EXCL_START
+            default:
+                assert(false);
+                // LCOV_EXCL_STOP
+        }
+
+        return error_msg + " " + context + ": " + detail;
+    }
+
     /// input adapter
     input_adapter_t ia = nullptr;
 
@@ -8670,7 +8812,7 @@ class binary_writer
         }
         else
         {
-            JSON_THROW(out_of_range::create(407, "number overflow serializing " + std::to_string(n)));
+            JSON_THROW(out_of_range::create(407, "integer number " + std::to_string(n) + " cannot be represented by UBJSON as it does not fit int64"));
         }
     }
 
@@ -8724,7 +8866,7 @@ class binary_writer
         // LCOV_EXCL_START
         else
         {
-            JSON_THROW(out_of_range::create(407, "number overflow serializing " + std::to_string(n)));
+            JSON_THROW(out_of_range::create(407, "integer number " + std::to_string(n) + " cannot be represented by UBJSON as it does not fit int64"));
         }
         // LCOV_EXCL_STOP
     }
@@ -10591,6 +10733,9 @@ class serializer
 #include <initializer_list>
 #include <utility>
 
+// #include <nlohmann/detail/meta/type_traits.hpp>
+
+
 namespace nlohmann
 {
 namespace detail
@@ -10613,10 +10758,12 @@ class json_ref
         : owned_value(init), value_ref(&owned_value), is_rvalue(true)
     {}
 
-    template<class... Args>
-    json_ref(Args&& ... args)
-        : owned_value(std::forward<Args>(args)...), value_ref(&owned_value), is_rvalue(true)
-    {}
+    template <
+        class... Args,
+        enable_if_t<std::is_constructible<value_type, Args...>::value, int> = 0 >
+    json_ref(Args && ... args)
+        : owned_value(std::forward<Args>(args)...), value_ref(&owned_value),
+          is_rvalue(true) {}
 
     // class should be movable only
     json_ref(json_ref&&) = default;

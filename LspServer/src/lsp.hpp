@@ -2,29 +2,125 @@
  * lsp.hpp
  *
  * @author Peter Lenkefi
- * @date 2018-10-11
- * @description Structures for the actual LSP communication.
+ * @date 2018-10-23
+ * @description Here are the main Language Server Protocol structures and
+ * interfaces to communicate with the client.
  */
 
-#ifndef LSP_LSP_HPP
-#define LSP_LSP_HPP
+#ifndef LSP_HPP
+#define LSP_HPP
 
 #include <iostream>
-#include "common.hpp"
+#include "rpc.hpp"
 
 namespace lsp {
 
-using uri_type = str;
-using code_action_kind = str;
+struct initialize_params;
+struct initialize_result;
 
+/**
+ * The interface that the language server object has to implement.
+ */
+struct langserver {
+	virtual initialize_result on_initialize(initialize_params const&) = 0;
+};
+
+/**
+ * A helper object to send and receive LSP messages.
+ */
+struct connection {
+	explicit connection(std::istream& in, std::ostream& out)
+		: m_In(&in), m_Out(&out) {
+		global_init();
+	}
+
+	void write(rpc::message const& msg);
+	rpc::message read();
+
+	auto& in() { return *m_In; }
+	auto const& in() const { return *m_In; }
+
+	auto& out() { return *m_Out; }
+	auto const& out() const { return *m_Out; }
+
+private:
+	struct message_header {
+		u32 content_length = 0;
+		std::string content_type = "";
+	};
+
+	static void global_init();
+
+	bool read_message_header_part(message_header& h);
+	message_header read_message_header();
+
+	std::istream* m_In;
+	std::ostream* m_Out;
+};
+
+/**
+ * A wrapper for a language server that dispatches method calls.
+ */
+struct langserver_handler {
+	explicit langserver_handler(std::istream& in, std::ostream& out,
+		langserver& ls)
+		: m_Connection(in, out), m_Langserver(&ls) {
+	}
+
+	auto& in() { return m_Connection.in(); }
+	auto const& in() const { return m_Connection.in(); }
+
+	auto& out() { return m_Connection.out(); }
+	auto const& out() const { return m_Connection.out(); }
+
+	void next();
+
+private:
+	connection m_Connection;
+	langserver* m_Langserver;
+	bool m_Initialized = false;
+};
+
+/**
+ * Starts a language server with an infinite message-loop.
+ * @param ls The language server object to use.
+ * @param in The input stream to read the messages from.
+ * @param out The output stream to write the messages to.
+ */
+void start_langserver(langserver& ls, std::istream& in, std::ostream& out);
+
+#define ctors(x) 					\
+x() = default;						\
+x(x const&) = default; 				\
+x(x&&) = default; 					\
+x& operator=(x const&) = default; 	\
+x& operator=(x&&) = default
+
+#define named_mem(type, name) 											\
+public:																	\
+auto const& name() const { return m_##name; }							\
+template <typename T>													\
+auto& name(T&& val) { m_##name = std::forward<T>(val); return *this; }	\
+private:																\
+type m_##name
+
+/**
+ * ResourceOperationKind.
+ */
 enum class resource_operation_kind {
 	create, rename, delete_,
 };
 
+/**
+ * FailureHandlingKind.
+ */
 enum class failure_handling_kind {
-	abort, transactional, undo, text_only_transactional
+	abort, transactional, undo, text_only_transactional,
 };
 
+/**
+ * SymbolKind.
+ */
 enum class symbol_kind {
 	file = 1,
 	module = 2,
@@ -33,7 +129,7 @@ enum class symbol_kind {
 	class_ = 5,
 	method = 6,
 	property = 7,
-	dield = 8,
+	field = 8,
 	constructor = 9,
 	enum_ = 10,
 	interface = 11,
@@ -54,10 +150,16 @@ enum class symbol_kind {
 	type_parameter = 26,
 };
 
+/**
+ * MarkupKind.
+ */
 enum class markup_kind {
 	plaintext, markdown,
 };
 
+/**
+ * CompletionItemKind.
+ */
 enum class completion_item_kind {
 	text = 1,
 	method = 2,
@@ -86,611 +188,489 @@ enum class completion_item_kind {
 	type_parameter = 25,
 };
 
-enum class text_document_sync_kind {
-	none = 0,
-	full = 1,
-	incremental = 2,
+/**
+ * A WorkspaceFolder.
+ */
+struct workspace_folder {
+	ctors(workspace_folder);
+
+	static workspace_folder from_json(json const& js);
+
+	named_mem(std::string, uri);
+	named_mem(std::string, name);
 };
-
-#define member(ty, name, access) 				\
-public:											\
-	ty& access() { return name; }				\
-	ty const& access() const { return name; }	\
-private:										\
-	ty name
-
-#define member_b(ty, name, access)	\
-public:								\
-template <typename T>				\
-auto& access(T&& val) {				\
-access() = std::forward<T>(val);	\
-return *this;						\
-}									\
-member(ty, name, access)
-
-#define ctors(name)						\
-name() = default;						\
-name(name const&) = default;			\
-name(name&&) = default;					\
-name& operator=(name const&) = default;	\
-name& operator=(name&&) = default
-
-#define dyn_reg \
-member(bool, m_DynamicRegistration, dynamic_registration) = false
 
 /**
  * WorkspaceClientCapabilities.
  */
 struct workspace_client_capabilities {
+	/**
+	 * WorkspaceEdit.
+	 */
 	struct workspace_edit_t {
 		ctors(workspace_edit_t);
 
-		member(bool, m_DocumentChanges, document_changes) = false;
-		member(opt<vec<resource_operation_kind>>, m_ResourceOperations, resource_operations);
-		member(opt<failure_handling_kind>, m_FailureHandling, failure_handling);
+		static workspace_edit_t from_json(json const& js);
+
+		named_mem(bool, document_changes) = false;
+		named_mem(std::vector<resource_operation_kind>, resource_operations);
+		named_mem(failure_handling_kind, failure_handling) = failure_handling_kind::abort;
 	};
 
+	/**
+	 * DidChangeConfiguration.
+	 */
 	struct did_change_configuration_t {
 		ctors(did_change_configuration_t);
 
-		dyn_reg;
+		static did_change_configuration_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * DidChangeWatchedFiles.
+	 */
 	struct did_change_watched_files_t {
 		ctors(did_change_watched_files_t);
 
-		dyn_reg;
+		static did_change_watched_files_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * Symbol.
+	 */
 	struct symbol_t {
+		/**
+		 * SymbolKind.
+		 */
 		struct symbol_kind_t {
 			ctors(symbol_kind_t);
 
-			member(opt<vec<symbol_kind>>, m_ValueSet, value_set) = none;
+			static symbol_kind_t from_json(json const& js);
+
+			named_mem(std::vector<symbol_kind>, value_set);
 		};
 
 		ctors(symbol_t);
 
-		dyn_reg;
-		member(opt<symbol_kind_t>, m_SymbolKind, symbol_kind) = none;
+		static symbol_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
+		named_mem(std::optional<symbol_kind_t>, symbol_kind) = std::nullopt;
 	};
 
+	/**
+	 * ExecuteCommand.
+	 */
 	struct execute_command_t {
 		ctors(execute_command_t);
 
-		dyn_reg;
+		static execute_command_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
 	ctors(workspace_client_capabilities);
 
-	member(bool, m_ApplyEdit, apply_edit) = false;
-	member(opt<workspace_edit_t>, m_WorkspaceEdit, workspace_edit) = none;
-	member(opt<did_change_configuration_t>, m_DidChangeConfiguration, did_change_configuration) = none;
-	member(opt<did_change_watched_files_t>, m_DidChangeWatchedFiles, did_change_watched_files) = none;
-	member(opt<symbol_t>, m_Symbol, symbol) = none;
-	member(opt<execute_command_t>, m_ExecuteCommand, execute_command) = none;
-	member(bool, m_WorkspaceFolders, workspace_folders) = false;
-	member(bool, m_Configuration, configuration) = false;
+	static workspace_client_capabilities from_json(json const& js);
+
+	named_mem(bool, apply_edit) = false;
+	named_mem(std::optional<workspace_edit_t>, workspace_edit) = std::nullopt;
+	named_mem(std::optional<did_change_configuration_t>, did_change_configuration) = std::nullopt;
+	named_mem(std::optional<did_change_watched_files_t>, did_change_watched_files) = std::nullopt;
+	named_mem(std::optional<symbol_t>, symbol) = std::nullopt;
+	named_mem(std::optional<execute_command_t>, execute_command) = std::nullopt;
+	named_mem(bool, workspace_folders) = false;
+	named_mem(bool, configuration) = false;
 };
 
 /**
  * TextDocumentClientCapabilities.
  */
 struct text_document_client_capabilities {
+	/**
+	 * Synchronization.
+	 */
 	struct synchronization_t {
 		ctors(synchronization_t);
 
-		dyn_reg;
-		member(bool, m_WillSave, will_save) = false;
-		member(bool, m_WillSaveWaitUntil, will_save_wait_until) = false;
-		member(bool, m_DidSave, did_save) = false;
+		static synchronization_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
+		named_mem(bool, will_save) = false;
+		named_mem(bool, will_save_wait_until) = false;
+		named_mem(bool, did_save) = false;
 	};
 
+	/**
+	 * Completion.
+	 */
 	struct completion_t {
+		/**
+	 	* CompletionItem.
+		 */
 		struct completion_item_t {
 			ctors(completion_item_t);
 
-			member(bool, m_SnippetSupport, snippet_support) = false;
-			member(bool, m_CommitCharactersSupport, commit_character_support) = false;
-			member(opt<vec<markup_kind>>, m_DocumentationFormat, documentation_format) = none;
-			member(bool, m_DeprecatedSupport, deprecated_support) = false;
-			member(bool, m_PreselectSupport, preselect_support) = false;
+			static completion_item_t from_json(json const& js);
+
+			named_mem(bool, snippet_support) = false;
+			named_mem(bool, commit_characters_support) = false;
+			named_mem(std::vector<markup_kind>, documentation_format);
+			named_mem(bool, deprecated_support) = false;
+			named_mem(bool, preselect_support) = false;
 		};
 
+		/**
+		 * CompletionItemKind.
+		 */
 		struct completion_item_kind_t {
 			ctors(completion_item_kind_t);
 
-			member(opt<vec<completion_item_kind>>, m_ValueSet, value_set) = none;
+			static completion_item_kind_t from_json(json const& js);
+
+			named_mem(std::vector<completion_item_kind>, value_set);
 		};
 
 		ctors(completion_t);
 
-		dyn_reg;
-		member(opt<completion_item_t>, m_CompletionItem, completion_item) = none;
-		member(opt<completion_item_kind_t>, m_CompletionItemKind, completion_item_kind) = none;
-		member(bool, m_ContextSupport, context_support) = false;
+		static completion_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
+		named_mem(std::optional<completion_item_t>, completion_item) = std::nullopt;
+		named_mem(std::optional<completion_item_kind_t>, completion_item_kind) = std::nullopt;
+		named_mem(bool, context_support) = false;
 	};
 
+	/**
+	 * Hover.
+	 */
 	struct hover_t {
 		ctors(hover_t);
 
-		dyn_reg;
-		member(opt<vec<markup_kind>>, m_ContentFormat, content_format) = none;
+		static hover_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
+		named_mem(std::vector<markup_kind>, content_format);
 	};
 
+	/**
+	 * SignatureHelp.
+	 */
 	struct signature_help_t {
+		/**
+		 * SignatureInformation.
+		 */
 		struct signature_information_t {
 			ctors(signature_information_t);
 
-			member(opt<vec<markup_kind>>, m_DocumentationFormat, documentation_format) = none;
+			static signature_information_t from_json(json const& js);
+
+			named_mem(std::vector<markup_kind>, documentation_format);
 		};
 
 		ctors(signature_help_t);
 
-		dyn_reg;
-		member(opt<signature_information_t>, m_SignatureInformation, signature_information) = none;
+		static signature_help_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
+		named_mem(std::optional<signature_information_t>, signature_information) = std::nullopt;
 	};
 
+	/**
+	 * References.
+	 */
 	struct references_t {
 		ctors(references_t);
 
-		dyn_reg;
+		static references_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * DocumentHighlight.
+	 */
 	struct document_highlight_t {
 		ctors(document_highlight_t);
 
-		dyn_reg;
+		static document_highlight_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * DocumentSymbol.
+	 */
 	struct document_symbol_t {
+		/**
+		 * symbolKindT.
+		 */
 		struct symbol_kind_t {
 			ctors(symbol_kind_t);
 
-			member(opt<vec<symbol_kind>>, m_ValueSet, value_set) = none;
+			static symbol_kind_t from_json(json const& js);
+
+			named_mem(std::vector<symbol_kind>, value_set);
 		};
 
 		ctors(document_symbol_t);
 
-		dyn_reg;
-		member(opt<symbol_kind_t>, m_SymbolKind, symbol_kind) = none;
-		member(bool, m_HierarchicalDocumentSymbolSupport, hierarchical_document_symbol_support) = false;
+		static document_symbol_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
+		named_mem(std::optional<symbol_kind_t>, symbol_kind) = std::nullopt;
+		named_mem(bool, hierarchical_document_symbol_support) = false;
 	};
 
+	/**
+	 * Formatting.
+	 */
 	struct formatting_t {
 		ctors(formatting_t);
 
-		dyn_reg;
+		static formatting_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * RangeFormatting.
+	 */
 	struct range_formatting_t {
 		ctors(range_formatting_t);
 
-		dyn_reg;
+		static range_formatting_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * OnTypeFormatting.
+	 */
 	struct on_type_formatting_t {
 		ctors(on_type_formatting_t);
 
-		dyn_reg;
+		static on_type_formatting_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * Definition.
+	 */
 	struct definition_t {
 		ctors(definition_t);
 
-		dyn_reg;
+		static definition_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * TypeDefinition.
+	 */
 	struct type_definition_t {
 		ctors(type_definition_t);
 
-		dyn_reg;
+		static type_definition_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * Implementation.
+	 */
 	struct implementation_t {
 		ctors(implementation_t);
 
-		dyn_reg;
+		static implementation_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * CodeAction.
+	 */
 	struct code_action_t {
+		/**
+		 * CodeActionLiteralSupport.
+		 */
 		struct code_action_literal_support_t {
+			/**
+			 * CcodeActionKind.
+			 */
 			struct code_action_kind_t {
 				ctors(code_action_kind_t);
 
-				member(vec<code_action_kind>, m_ValueSet, value_set);
+				static code_action_kind_t from_json(json const& js);
+
+				named_mem(std::vector<std::string>, value_set);
 			};
 
 			ctors(code_action_literal_support_t);
 
-			member(code_action_kind_t, m_CodeActionKind, code_action_kind);
+			static code_action_literal_support_t from_json(json const& js);
+
+			named_mem(code_action_kind_t, code_action_kind);
 		};
 
 		ctors(code_action_t);
 
-		dyn_reg;
-		member(opt<code_action_literal_support_t>, m_CodeActionLiteralSupport, code_action_literal_support) = none;
+		static code_action_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
+		named_mem(std::optional<code_action_literal_support_t>, code_action_literal_support) = std::nullopt;
 	};
 
+	/**
+	 * CodeLens.
+	 */
 	struct code_lens_t {
 		ctors(code_lens_t);
 
-		dyn_reg;
+		static code_lens_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * DocumentLink.
+	 */
 	struct document_link_t {
 		ctors(document_link_t);
 
-		dyn_reg;
+		static document_link_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * ColorProvider.
+	 */
 	struct color_provider_t {
 		ctors(color_provider_t);
 
-		dyn_reg;
+		static color_provider_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
 	};
 
+	/**
+	 * Rename.
+	 */
 	struct rename_t {
 		ctors(rename_t);
 
-		dyn_reg;
-		member(bool, m_PrepareSupport, prepare_support) = false;
+		static rename_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
+		named_mem(bool, prepare_support) = false;
 	};
 
+	/**
+	 * PublishDiagnostics.
+	 */
 	struct publish_diagnostics_t {
 		ctors(publish_diagnostics_t);
 
-		member(bool, m_RelatedInformation, related_information) = false;
+		static publish_diagnostics_t from_json(json const& js);
+
+		named_mem(bool, related_information) = false;
 	};
 
+	/**
+	 * foldingRangeT.
+	 */
 	struct folding_range_t {
 		ctors(folding_range_t);
 
-		dyn_reg;
-		member(opt<u32>, m_RangeLimit, range_limit) = none;
-		member(bool, m_LineFoldingOnly, line_folding_only) = true;
+		static folding_range_t from_json(json const& js);
+
+		named_mem(bool, dynamic_registration) = false;
+		named_mem(std::optional<i32>, range_limit) = std::nullopt;
+		named_mem(bool, line_folding_only) = true;
 	};
 
 	ctors(text_document_client_capabilities);
 
-	member(opt<synchronization_t>, m_Synchronization, synchronization) = none;
-	member(opt<completion_t>, m_Completion, completion) = none;
-	member(opt<hover_t>, m_Hover, hover) = none;
-	member(opt<signature_help_t>, m_SignatureHelp, signature_help) = none;
-	member(opt<references_t>, m_References, references) = none;
-	member(opt<document_highlight_t>, m_DocumentHighlight, document_highlight) = none;
-	member(opt<document_symbol_t>, m_DocumentSymbol, document_symbol) = none;
-	member(opt<formatting_t>, m_Formatting, formatting) = none;
-	member(opt<range_formatting_t>, m_RangeFormatting, range_formatting) = none;
-	member(opt<on_type_formatting_t>, m_OnTypeFormatting, on_type_formatting) = none;
-	member(opt<definition_t>, m_Definition, definition) = none;
-	member(opt<type_definition_t>, m_TypeDefinition, type_definition) = none;
-	member(opt<implementation_t>, m_Implementation, implementation) = none;
-	member(opt<code_action_t>, m_CodeAction, code_action) = none;
-	member(opt<code_lens_t>, m_CodeLens, code_lens) = none;
-	member(opt<document_link_t>, m_DocumentLink, document_link) = none;
-	member(opt<color_provider_t>, m_ColorProvider, color_provider) = none;
-	member(opt<rename_t>, m_Rename, rename) = none;
-	member(opt<publish_diagnostics_t>, m_PublishDiagnostics, publish_diagnostics) = none;
-	member(opt<folding_range_t>, m_FoldingRange, folding_range) = none;
+	static text_document_client_capabilities from_json(json const& js);
+
+	// XXX(LPeter1997): Implement
+	named_mem(std::optional<synchronization_t>, synchronization) = std::nullopt;
+	named_mem(std::optional<completion_t>, completion) = std::nullopt;
+	named_mem(std::optional<hover_t>, hover) = std::nullopt;
+	named_mem(std::optional<signature_help_t>, signature_help) = std::nullopt;
+	named_mem(std::optional<references_t>, references) = std::nullopt;
+	named_mem(std::optional<document_highlight_t>, document_highlight) = std::nullopt;
+	named_mem(std::optional<document_symbol_t>, document_symbol) = std::nullopt;
+	named_mem(std::optional<formatting_t>, formatting) = std::nullopt;
+	named_mem(std::optional<range_formatting_t>, range_formatting) = std::nullopt;
+	named_mem(std::optional<on_type_formatting_t>, on_type_formatting) = std::nullopt;
+	named_mem(std::optional<definition_t>, definition) = std::nullopt;
+	named_mem(std::optional<type_definition_t>, type_definition) = std::nullopt;
+	named_mem(std::optional<implementation_t>, implementation) = std::nullopt;
+	named_mem(std::optional<code_action_t>, code_action) = std::nullopt;
+	named_mem(std::optional<code_lens_t>, code_lens) = std::nullopt;
+	named_mem(std::optional<document_link_t>, document_link) = std::nullopt;
+	named_mem(std::optional<color_provider_t>, color_provider) = std::nullopt;
+	named_mem(std::optional<rename_t>, rename) = std::nullopt;
+	named_mem(std::optional<publish_diagnostics_t>, publish_diagnostics) = std::nullopt;
+	named_mem(std::optional<folding_range_t>, folding_range) = std::nullopt;
 };
 
 /**
- * The ClientCapabilities structure used for initialization.
+ * ClientCapabilities.
  */
 struct client_capabilities {
 	ctors(client_capabilities);
 
-	member(workspace_client_capabilities, m_Workspace, workspace);
-	member(text_document_client_capabilities, m_TextDocument, text_document);
-	member(opt<json>, m_Experimental, experimental);
+	static client_capabilities from_json(json const& js);
+
+	named_mem(std::optional<workspace_client_capabilities>, workspace) = std::nullopt;
+	named_mem(std::optional<text_document_client_capabilities>, text_document) = std::nullopt;
+	named_mem(std::optional<json>, experimental) = std::nullopt;
 };
 
 /**
- * WorkspaceFolder.
- */
-struct workspace_folder {
-	ctors(workspace_folder);
-
-	member(str, m_URI, uri);
-	member(str, m_Name, name);
-};
-
-/**
- * InitializeParams, the params for the 'initialize' request.
+ * The parameter supplied at the 'initialize' Request, called InitializeParams.
  */
 struct initialize_params {
-	enum class trace_kind {
+	enum class trace_t {
 		off, messages, verbose,
 	};
 
 	ctors(initialize_params);
 
-	auto const& root() const {
-		if (auto const& res = root_uri(); res) {
-			return res;
-		}
-		return root_path();
-	}
+	static initialize_params from_json(json const& js);
 
-	member(opt<i32>, m_ProcessID, process_id) = none;
-	member(opt<str>, m_RootPath, root_path) = none;
-	member(opt<uri_type>, m_RoorURI, root_uri) = none;
-	member(opt<json>, m_InitializationOptions, initialization_options) = none;
-	member(client_capabilities, m_Capabilities, capabilities);
-	member(trace_kind, m_Trace, trace) = trace_kind::off;
-	member(opt<vec<workspace_folder>>, m_WorkspaceFolders, workspace_folders) = none;
+	std::optional<std::string> const& root() const;
+
+	named_mem(std::optional<i32>, process_id) = std::nullopt;
+	named_mem(std::optional<std::string>, root_path) = std::nullopt;
+	named_mem(std::optional<std::string>, root_uri) = std::nullopt;
+	named_mem(json, initialization_options) = nullptr;
+	named_mem(client_capabilities, capabilities);
+	named_mem(trace_t, trace) = trace_t::off;
+	named_mem(std::optional<std::vector<workspace_folder>>, workspace_folders) = std::nullopt;
 };
 
 /**
- * SaveOptions.
- */
-struct save_options {
-	ctors(save_options);
-
-	json to_json() const;
-
-	member_b(bool, m_IncludeText, include_text) = false;
-};
-
-/**
- * TextDocumentSyncOptions.
- */
-struct text_document_sync_options {
-	ctors(text_document_sync_options);
-
-	json to_json() const;
-
-	member_b(bool, m_OpenClose, open_close) = false;
-	member_b(text_document_sync_kind, m_Change, change) = text_document_sync_kind::none;
-	member_b(bool, m_WillSave, will_save) = false;
-	member_b(bool, m_WillSaveWaitUntil, will_save_wait_until) = false;
-	member_b(opt<save_options>, m_Save, save) = none;
-};
-
-/**
- * CompletionOptions.
- */
-struct completion_options {
-	ctors(completion_options);
-
-	json to_json() const;
-
-	member_b(bool, m_ResolveProvider, resolve_provider) = false;
-	member_b(opt<vec<char>>, m_TriggerCharacters, trigger_characters) = none;
-};
-
-/**
- * SignatureHelpOptions.
- */
-struct signature_help_options {
-	ctors(signature_help_options);
-
-	json to_json() const;
-
-	member_b(opt<vec<char>>, m_TriggerCharacters, trigger_characters);
-};
-
-/**
- * DocumentFilter.
- */
-struct document_filter {
-	ctors(document_filter);
-
-	json to_json() const;
-
-	member_b(opt<str>, m_Language, language) = none;
-	member_b(opt<str>, m_Scheme, scheme) = none;
-	member_b(opt<str>, m_Pattern, pattern) = none;
-};
-
-/**
- * DocumentSelector.
- */
-using document_selector = vec<document_filter>;
-
-/**
- * TextDocumentRegistrationOptions.
- */
-struct text_document_registration_options {
-	ctors(text_document_registration_options);
-
-	json to_json() const;
-
-	member_b(opt<::lsp::document_selector>, m_DocumentSelector, document_selector) = none;
-};
-
-/**
- * StaticRegistrationOptions.
- */
-struct static_registration_options {
-	ctors(static_registration_options);
-
-	json to_json() const;
-
-	member_b(opt<str>, m_ID, id) = none;
-};
-
-/**
- * CodeActionOptions.
- */
-struct code_action_options {
-	ctors(code_action_options);
-
-	json to_json() const;
-
-	member_b(opt<vec<code_action_kind>>, m_CodeActionKinds, code_action_kinds) = none;
-};
-
-/**
- * CodeLensOptions.
- */
-struct code_lens_options {
-	ctors(code_lens_options);
-
-	json to_json() const;
-
-	member_b(bool, m_ResolveProvider, resolve_provider) = false;
-};
-
-/**
- * DocumentOnTypeFormattingOptions.
- */
-struct document_on_type_formatting_options {
-	ctors(document_on_type_formatting_options);
-
-	json to_json() const;
-
-	member_b(char, m_FirstTriggerCharacter, first_trigger_character);
-	member_b(opt<vec<char>>, m_MoreTriggerCharacters, more_trigger_characters) = none;
-};
-
-/**
- * RenameOptions.
- */
-struct rename_options {
-	ctors(rename_options);
-
-	json to_json() const;
-
-	member_b(bool, m_PrepareProvider, prepare_provider) = false;
-};
-
-/**
- * DocumentLinkOptions.
- */
-struct document_link_options {
-	ctors(document_link_options);
-
-	json to_json() const;
-
-	member_b(bool, m_ResolveProvider, resolve_provider) = false;
-};
-
-/**
- * ColorProviderOptions.
- */
-struct color_provider_options {
-	ctors(color_provider_options);
-
-	json to_json() const;
-};
-
-/**
- * FoldingRangeProviderOptions.
- */
-struct folding_range_provider_options {
-	ctors(folding_range_provider_options);
-
-	json to_json() const;
-};
-
-/**
- * ExecuteCommandOptions.
- */
-struct execute_command_options {
-	ctors(execute_command_options);
-
-	json to_json() const;
-
-	member_b(vec<str>, m_Commands, commands);
-};
-
-/**
- * ServerCapabilities.
- */
-struct server_capabilities {
-	using text_document_sync_t = sum<text_document_sync_options, text_document_sync_kind>;
-	using type_definition_provider_t = sum<bool, prod<text_document_registration_options, static_registration_options>>;
-	using implementation_provider_t = type_definition_provider_t;
-	using code_action_provider_t = sum<bool, code_action_options>;
-	using rename_provider_t = sum<bool, rename_options>;
-	using color_provider_t = sum<bool, color_provider_options, prod<color_provider_options, text_document_registration_options, static_registration_options>>;
-	using folding_range_provider_t = sum<bool, folding_range_provider_options, prod<folding_range_provider_options, text_document_registration_options, static_registration_options>>;
-
-	struct workspace_t {
-		struct workspace_folders_t {
-			using change_notifications_t = sum<bool, str>;
-
-			ctors(workspace_folders_t);
-
-			json to_json() const;
-
-			member_b(bool, m_Supported, supported);
-			member_b(change_notifications_t, m_ChangeNotifications, change_notifications) = false;
-		};
-
-		ctors(workspace_t);
-
-		json to_json() const;
-
-		member_b(opt<workspace_folders_t>, m_WorkspaceFolders, workspace_folders) = none;
-	};
-
-	ctors(server_capabilities);
-
-	json to_json() const;
-
-	member_b(text_document_sync_t, m_TextDocumentSync, text_document_sync) = text_document_sync_kind::none;
-	member_b(bool, m_HoverProvider, hover_provider) = false;
-	member_b(opt<completion_options>, m_CompletionProvider, completion_provider) = none;
-	member_b(opt<signature_help_options>, m_SignatureHelpProvider, signature_help_provider) = none;
-	member_b(bool, m_DefinitionProvider, definition_provider) = false;
-	member_b(type_definition_provider_t, m_TypeDefinitionProvider, type_definition_provider) = false;
-	member_b(implementation_provider_t, m_ImplementationProvider, implementation_provider) = false;
-	member_b(bool, m_ReferencesProvider, references_provider) = false;
-	member_b(bool, m_DocumentHighlightProvider, document_highlight_provider) = false;
-	member_b(bool, m_DocumentSymbolProvider, document_symbol_provider) = false;
-	member_b(bool, m_WorkspaceSymbolProvider, workspace_symbol_provider) = false;
-	member_b(code_action_provider_t, m_CodeActionProvider, code_action_provider) = false;
-	member_b(opt<code_lens_options>, m_CodeLensOptions, code_lens_provider);
-	member_b(bool, m_DocumentFormattingProvider, document_formatting_provider) = false;
-	member_b(bool, m_DocumentRangeFormattingProvider, document_range_formatting_provider) = false;
-	member_b(opt<document_on_type_formatting_options>, m_DocumentOnTypeFormattingProvider, document_on_type_formatting_provider) = none;
-	member_b(rename_provider_t, m_RenameProvider, rename_provider) = false;
-	member_b(opt<document_link_options>, m_DocumentLinkProvider, document_link_provider) = none;
-	member_b(color_provider_t, m_ColorProvider, color_provider) = false;
-	member_b(folding_range_provider_t, m_FoldingRangeProvider, folding_range_provider) = false;
-	member_b(opt<execute_command_options>, m_ExecuteCommandProvider, execute_command_provider) = none;
-	member_b(opt<workspace_t>, m_Workspace, workspace) = none;
-	member_b(opt<json>, m_Experimental, experimental);
-};
-
-/**
- * InitializeResult, the answer to an initialization request.
+ * XXX(LPeter1997): TODO
  */
 struct initialize_result {
-	ctors(initialize_result);
-
-	json to_json() const;
-
-	member_b(server_capabilities, m_Capabilities, capabilities);
-};
-
-#undef dyn_reg
-#undef member
-#undef member_b
-#undef ctors
-
-struct i_server {
-	virtual initialize_result init(initialize_params const&) = 0;
-};
-
-struct msg;
-
-struct msg_handler {
-	explicit msg_handler(std::ostream& os, i_server& srvr)
-		: m_Ostream(&os), m_Server(&srvr) {
+	json to_json() const {
+		// XXX(LPeter1997): implement
+		return json();
 	}
-
-	void handle(msg& m);
-
-private:
-	std::ostream* m_Ostream;
-	i_server* m_Server;
-	bool m_Initialized = false;
 };
+
+#undef named_mem
+#undef ctors
 
 } /* namespace lsp */
 
-#endif /* LSP_LSP_HPP */
+#endif /* LSP_HPP */
