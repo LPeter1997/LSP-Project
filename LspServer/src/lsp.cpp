@@ -200,6 +200,7 @@ json tuple_to_json(T&& t);
 // Generic to json
 template <typename T>
 json any_to_json(T&& val) {
+	// XXX(LPeter1997): Exclude string, numbers and such
 	using type = std::decay_t<T>;
 
 	if constexpr (detail::is_tuple_v<type>) {
@@ -732,23 +733,23 @@ json server_capabilities::to_json() const {
 		.opt("signatureHelpProvider", signature_help_provider() | lift(any_to_json))
 		.set("definitionProvider", definition_provider())
 		.set("typeDefinitionProvider", any_to_json(type_definition_provider()))
-		//.set("implementationProvider", implementation_provider()/* XXX */)
-		//.set("referencesProvider", references_provider()/* XXX */)
-		//.set("documentHighlightProvider", document_highlight_provider()/* XXX */)
-		//.set("documentSymbolProvider", document_symbol_provider()/* XXX */)
-		//.set("workspaceSymbolProvider", workspace_symbol_provider()/* XXX */)
-		//.set("codeActionProvider", code_action_provider()/* XXX */)
-		//.set("codeLensProvider", code_lens_provider()/* XXX */)
-		//.set("documentFormattingProvider", document_formatting_provider()/* XXX */)
-		//.set("documentRangeFormattingProvider", document_range_formatting_provider()/* XXX */)
-		//.set("documentOnTypeFormattingProvider", document_on_type_formatting_provider()/* XXX */)
-		//.set("renameProvider", rename_provider()/* XXX */)
-		//.set("documentLinkProvider", document_link_provider()/* XXX */)
-		//.set("colorProvider", color_provider()/* XXX */)
-		//.set("foldingRangeProvider", folding_range_provider()/* XXX */)
-		//.set("executeCommandProvider", execute_command_provider()/* XXX */)
-		//.set("workspace", workspace()/* XXX */)
-		//.set("experimental", experimental()/* XXX */)
+		.set("implementationProvider", any_to_json(implementation_provider()))
+		.set("referencesProvider", references_provider())
+		.set("documentHighlightProvider", document_highlight_provider())
+		.set("documentSymbolProvider", document_symbol_provider())
+		.set("workspaceSymbolProvider", workspace_symbol_provider())
+		.set("codeActionProvider", code_action_provider()/* XXX */)
+		.set("codeLensProvider", code_lens_provider()/* XXX */)
+		.set("documentFormattingProvider", document_formatting_provider()/* XXX */)
+		.set("documentRangeFormattingProvider", document_range_formatting_provider()/* XXX */)
+		.set("documentOnTypeFormattingProvider", document_on_type_formatting_provider()/* XXX */)
+		.set("renameProvider", rename_provider()/* XXX */)
+		.set("documentLinkProvider", document_link_provider()/* XXX */)
+		.set("colorProvider", color_provider()/* XXX */)
+		.set("foldingRangeProvider", folding_range_provider()/* XXX */)
+		.set("executeCommandProvider", execute_command_provider()/* XXX */)
+		.set("workspace", workspace()/* XXX */)
+		.set("experimental", experimental()/* XXX */)
 		.get();
 }
 
@@ -812,6 +813,14 @@ json document_filter::to_json() const {
 json static_registration_options::to_json() const {
 	return jbuild()
 		.opt("id", id())
+		.get();
+}
+
+// CodeActionOptions
+
+json code_action_options::to_json() const {
+	return jbuild()
+		.set("codeActionKinds", vector_to_json(code_action_kinds()))
 		.get();
 }
 

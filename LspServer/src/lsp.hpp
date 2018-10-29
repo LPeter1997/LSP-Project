@@ -752,11 +752,23 @@ struct static_registration_options {
 };
 
 /**
+ * CodeActionOptions.
+ */
+struct code_action_options {
+	ctors(code_action_options);
+
+	json to_json() const;
+
+	named_mem(std::vector<std::string>, code_action_kinds);
+};
+
+/**
  * ServerCapabilities.
  */
 struct server_capabilities {
 	using text_document_sync_t = std::variant<text_document_sync_options, text_document_sync_kind>;
 	using type_definition_provider_t = std::variant<bool, std::tuple<text_document_registration_options, static_registration_options>>;
+	using implementation_provider_t = std::variant<bool, std::tuple<text_document_registration_options, static_registration_options>>;
 
 	ctors(server_capabilities);
 
@@ -769,23 +781,23 @@ struct server_capabilities {
 	named_mem(std::optional<signature_help_options>, signature_help_provider) = std::nullopt;
 	named_mem(bool, definition_provider) = false;
 	named_mem(type_definition_provider_t, type_definition_provider) = false;
-	//named_mem(/* XXX */, implementation_provider);
-	//named_mem(/* XXX */, references_provider);
-	//named_mem(/* XXX */, document_highlight_provider);
-	//named_mem(/* XXX */, document_symbol_provider);
-	//named_mem(/* XXX */, workspace_symbol_provider);
-	//named_mem(/* XXX */, code_action_provider);
-	//named_mem(/* XXX */, code_lens_provider);
-	//named_mem(/* XXX */, document_formatting_provider);
-	//named_mem(/* XXX */, document_range_formatting_provider);
-	//named_mem(/* XXX */, document_on_type_formatting_provider);
-	//named_mem(/* XXX */, rename_provider);
-	//named_mem(/* XXX */, document_link_provider);
-	//named_mem(/* XXX */, color_provider);
-	//named_mem(/* XXX */, folding_range_provider);
-	//named_mem(/* XXX */, execute_command_provider);
-	//named_mem(/* XXX */, workspace);
-	//named_mem(/* XXX */, experimental);
+	named_mem(implementation_provider_t, implementation_provider) = false;
+	named_mem(bool references_provider) = false;
+	named_mem(bool, document_highlight_provider) = false;
+	named_mem(bool, document_symbol_provider) = false;
+	named_mem(bool, workspace_symbol_provider) = false;
+	named_mem(/* XXX */, code_action_provider);
+	named_mem(/* XXX */, code_lens_provider);
+	named_mem(/* XXX */, document_formatting_provider);
+	named_mem(/* XXX */, document_range_formatting_provider);
+	named_mem(/* XXX */, document_on_type_formatting_provider);
+	named_mem(/* XXX */, rename_provider);
+	named_mem(/* XXX */, document_link_provider);
+	named_mem(/* XXX */, color_provider);
+	named_mem(/* XXX */, folding_range_provider);
+	named_mem(/* XXX */, execute_command_provider);
+	named_mem(/* XXX */, workspace);
+	named_mem(/* XXX */, experimental);
 };
 
 /**
