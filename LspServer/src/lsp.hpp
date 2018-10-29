@@ -98,6 +98,7 @@ x& operator=(x&&) = default
 
 #define named_mem(type, name) 											\
 public:																	\
+auto& name() { return m_##name; }										\
 auto const& name() const { return m_##name; }							\
 template <typename T>													\
 auto& name(T&& val) { m_##name = std::forward<T>(val); return *this; }	\
@@ -693,37 +694,98 @@ struct text_document_sync_options {
 };
 
 /**
+ * CompletionOptions.
+ */
+struct completion_options {
+	ctors(completion_options);
+
+	json to_json() const;
+
+	named_mem(bool, resolve_provider) = false;
+	named_mem(std::vector<char>, trigger_characters);
+};
+
+/**
+ * SignatureHelpOptions.
+ */
+struct signature_help_options {
+	ctors(signature_help_options);
+
+	json to_json() const;
+
+	named_mem(std::vector<char>, trigger_characters);
+};
+
+/**
+ * DocumentFilter.
+ */
+struct document_filter {
+	ctors(document_filter);
+
+	json to_json() const;
+
+	named_mem(std::optional<std::string>, language) = std::nullopt;
+	named_mem(std::optional<std::string>, scheme) = std::nullopt;
+	named_mem(std::optional<std::string>, pattern) = std::nullopt;
+};
+
+/**
+ * TextDocumentRegistrationOptions.
+ */
+struct text_document_registration_options {
+	ctors(text_document_registration_options);
+
+	json to_json() const;
+
+	named_mem(std::optional<std::vector<document_filter>>, document_selector) = std::nullopt;
+};
+
+/**
+ * StaticRegistrationOptions.
+ */
+struct static_registration_options {
+	ctors(static_registration_options);
+
+	json to_json() const;
+
+	named_mem(std::optional<std::string>, id) = std::nullopt;
+};
+
+/**
  * ServerCapabilities.
  */
 struct server_capabilities {
+	using text_document_sync_t = std::variant<text_document_sync_options, text_document_sync_kind>;
+	using type_definition_provider_t = std::variant<bool, std::tuple<text_document_registration_options, static_registration_options>>;
+
 	ctors(server_capabilities);
 
 	json to_json() const;
 
 	// XXX(LPeter1997): Implement
-	named_mem(/* XXX */, text_document_sync);
-	named_mem(/* XXX */, hover_provider);
-	named_mem(/* XXX */, completion_provider);
-	named_mem(/* XXX */, signature_help_provider);
-	named_mem(/* XXX */, definition_provider);
-	named_mem(/* XXX */, type_definition_provider);
-	named_mem(/* XXX */, implementation_provider);
-	named_mem(/* XXX */, references_provider);
-	named_mem(/* XXX */, document_highlight_provider);
-	named_mem(/* XXX */, document_symbol_provider);
-	named_mem(/* XXX */, workspace_symbol_provider);
-	named_mem(/* XXX */, code_action_provider);
-	named_mem(/* XXX */, code_lens_provider);
-	named_mem(/* XXX */, document_formatting_provider);
-	named_mem(/* XXX */, document_range_formatting_provider);
-	named_mem(/* XXX */, document_on_type_formatting_provider);
-	named_mem(/* XXX */, rename_provider);
-	named_mem(/* XXX */, document_link_provider);
-	named_mem(/* XXX */, color_provider);
-	named_mem(/* XXX */, folding_range_provider);
-	named_mem(/* XXX */, execute_command_provider);
-	named_mem(/* XXX */, workspace);
-	named_mem(/* XXX */, experimental);
+	named_mem(text_document_sync_t, text_document_sync) = text_document_sync_kind::none;
+	named_mem(bool, hover_provider) = false;
+	named_mem(std::optional<completion_options>, completion_provider) = std::nullopt;
+	named_mem(std::optional<signature_help_options>, signature_help_provider) = std::nullopt;
+	named_mem(bool, definition_provider) = false;
+	named_mem(type_definition_provider_t, type_definition_provider) = false;
+	//named_mem(/* XXX */, implementation_provider);
+	//named_mem(/* XXX */, references_provider);
+	//named_mem(/* XXX */, document_highlight_provider);
+	//named_mem(/* XXX */, document_symbol_provider);
+	//named_mem(/* XXX */, workspace_symbol_provider);
+	//named_mem(/* XXX */, code_action_provider);
+	//named_mem(/* XXX */, code_lens_provider);
+	//named_mem(/* XXX */, document_formatting_provider);
+	//named_mem(/* XXX */, document_range_formatting_provider);
+	//named_mem(/* XXX */, document_on_type_formatting_provider);
+	//named_mem(/* XXX */, rename_provider);
+	//named_mem(/* XXX */, document_link_provider);
+	//named_mem(/* XXX */, color_provider);
+	//named_mem(/* XXX */, folding_range_provider);
+	//named_mem(/* XXX */, execute_command_provider);
+	//named_mem(/* XXX */, workspace);
+	//named_mem(/* XXX */, experimental);
 };
 
 /**
@@ -734,8 +796,7 @@ struct initialize_result {
 
 	json to_json() const;
 
-	// XXX(LPeter1997): Implement
-	named_mem(/* XXX */, capabilities);
+	named_mem(server_capabilities, capabilities);
 };
 
 #undef named_mem

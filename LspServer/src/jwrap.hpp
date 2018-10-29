@@ -48,6 +48,25 @@ struct jbuild {
 		return *this;
 	}
 
+	template <typename T>
+	auto& opt(char const* name, T&& val) {
+		if (val) {
+			m_JSON[name] = *std::forward<T>(val);
+		}
+		return *this;
+	}
+
+	template <typename T>
+	auto& opt_as_null(char const* name, T&& val) {
+		if (val) {
+			m_JSON[name] = *std::forward<T>(val);
+		}
+		else {
+			m_JSON[name] = nullptr;
+		}
+		return *this;
+	}
+
 	json get() {
 		return std::move(m_JSON);
 	}

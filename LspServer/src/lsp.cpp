@@ -125,6 +125,9 @@ void start_langserver(langserver& ls, std::istream& in, std::ostream& out) {
 }
 
 template <typename T>
+json any_to_json(T&& val);
+
+template <typename T>
 T ident(T&& val) {
 	return val;
 }
@@ -164,6 +167,106 @@ auto list(Fn fn) {
 
 		return vec;
 	};
+}
+
+namespace detail {
+	template <typename>
+	struct is_tuple : std::false_type {};
+
+	template <typename... Ts>
+	struct is_tuple<std::tuple<Ts...>> : std::true_type {};
+
+	template <typename T>
+	inline constexpr bool is_tuple_v = is_tuple<T>::value;
+
+	////
+
+	template <typename>
+	struct is_variant : std::false_type {};
+
+	template <typename... Ts>
+	struct is_variant<std::variant<Ts...>> : std::true_type {};
+
+	template <typename T>
+	inline constexpr bool is_variant_v = is_variant<T>::value;
+} /* namespace detail */
+
+template <typename V>
+json variant_to_json(V&& v);
+
+template <typename T>
+json tuple_to_json(T&& t);
+
+// Generic to json
+template <typename T>
+json any_to_json(T&& val) {
+	using type = std::decay_t<T>;
+
+	if constexpr (detail::is_tuple_v<type>) {
+		return tuple_to_json(std::forward<T>(val));
+	}
+	else if constexpr (detail::is_variant_v<type>) {
+		return variant_to_json(std::forward<T>(val));
+	}
+	else if constexpr (std::is_class_v<type>) {
+		return val.to_json();
+	}
+	else if constexpr (std::is_enum_v<type>) {
+		return json(i32(val));
+	}
+	else {
+		lsp_unimplemented;
+	}
+}
+
+// Variant helper
+struct visitor {
+	template <typename T>
+	auto operator()(T&& val) {
+		return any_to_json(std::forward<T>(val));
+	}
+};
+
+template <typename V>
+json variant_to_json(V&& v) {
+	return std::visit(visitor(), std::forward<V>(v));
+}
+
+namespace detail {
+	void tuple_to_json_impl(json& b) {}
+
+	template <typename T1, typename... Ts>
+	void tuple_to_json_impl(json& b, T1&& fst, Ts&&... rest) {
+		auto js = any_to_json(std::forward<T1>(fst));
+		for (json::const_iterator it = js.begin(); it != js.end(); ++it) {
+			b.push_back(*it);
+		}
+		tuple_to_json_impl(b, std::forward<Ts>(rest)...);
+	}
+
+	template <typename T, std::size_t... Indicies>
+	json invoke_tuple_to_json(T&& tup, std::index_sequence<Indicies...>) {
+		json res;
+		tuple_to_json_impl(res, std::get<Indicies>(std::forward<T>(tup))...);
+		return res;
+	}
+} /* namespace detail */
+
+template <typename T>
+json tuple_to_json(T&& t) {
+	return detail::invoke_tuple_to_json(
+		std::forward<T>(t),
+		std::make_index_sequence<std::tuple_size_v<std::decay_t<T>>>()
+	);
+}
+
+template <typename V>
+json vector_to_json(V&& vec) {
+	json res;
+	for (auto&& elem : std::forward<V>(vec)) {
+		res.push_back(any_to_json(std::forward<decltype(elem)>(elem)));
+	}
+	return res;
 }
 
 #define dyn_reg() \
@@ -615,7 +718,7 @@ text_document_client_capabilities::folding_range_t::from_json(json const& js) {
 
 json initialize_result::to_json() const {
 	return jbuild()
-		.set("capabilities", capabilities())
+		.set("capabilities", capabilities().to_json())
 		.get();
 }
 
@@ -623,30 +726,29 @@ json initialize_result::to_json() const {
 
 json server_capabilities::to_json() const {
 	return jbuild()
-		// XXX(LPeter1997): Implement
-		.set("textDocumentSync", text_document_sync()/* XXX */)
-		.set("hoverProvider", hover_provider()/* XXX */)
-		.set("completionProvider", completion_provider()/* XXX */)
-		.set("signatureHelpProvider", signature_help_provider()/* XXX */)
-		.set("definitionProvider", definition_provider()/* XXX */)
-		.set("typeDefinitionProvider", type_definition_provider()/* XXX */)
-		.set("implementationProvider", implementation_provider()/* XXX */)
-		.set("referencesProvider", references_provider()/* XXX */)
-		.set("documentHighlightProvider", document_highlight_provider()/* XXX */)
-		.set("documentSymbolProvider", document_symbol_provider()/* XXX */)
-		.set("workspaceSymbolProvider", workspace_symbol_provider()/* XXX */)
-		.set("codeActionProvider", code_action_provider()/* XXX */)
-		.set("codeLensProvider", code_lens_provider()/* XXX */)
-		.set("documentFormattingProvider", document_formatting_provider()/* XXX */)
-		.set("documentRangeFormattingProvider", document_range_formatting_provider()/* XXX */)
-		.set("documentOnTypeFormattingProvider", document_on_type_formatting_provider()/* XXX */)
-		.set("renameProvider", rename_provider()/* XXX */)
-		.set("documentLinkProvider", document_link_provider()/* XXX */)
-		.set("colorProvider", color_provider()/* XXX */)
-		.set("foldingRangeProvider", folding_range_provider()/* XXX */)
-		.set("executeCommandProvider", execute_command_provider()/* XXX */)
-		.set("workspace", workspace()/* XXX */)
-		.set("experimental", experimental()/* XXX */)
+		.set("textDocumentSync", variant_to_json(text_document_sync()))
+		.set("hoverProvider", hover_provider())
+		.opt("completionProvider", completion_provider() | lift(any_to_json))
+		.opt("signatureHelpProvider", signature_help_provider() | lift(any_to_json))
+		.set("definitionProvider", definition_provider())
+		.set("typeDefinitionProvider", any_to_json(type_definition_provider()))
+		//.set("implementationProvider", implementation_provider()/* XXX */)
+		//.set("referencesProvider", references_provider()/* XXX */)
+		//.set("documentHighlightProvider", document_highlight_provider()/* XXX */)
+		//.set("documentSymbolProvider", document_symbol_provider()/* XXX */)
+		//.set("workspaceSymbolProvider", workspace_symbol_provider()/* XXX */)
+		//.set("codeActionProvider", code_action_provider()/* XXX */)
+		//.set("codeLensProvider", code_lens_provider()/* XXX */)
+		//.set("documentFormattingProvider", document_formatting_provider()/* XXX */)
+		//.set("documentRangeFormattingProvider", document_range_formatting_provider()/* XXX */)
+		//.set("documentOnTypeFormattingProvider", document_on_type_formatting_provider()/* XXX */)
+		//.set("renameProvider", rename_provider()/* XXX */)
+		//.set("documentLinkProvider", document_link_provider()/* XXX */)
+		//.set("colorProvider", color_provider()/* XXX */)
+		//.set("foldingRangeProvider", folding_range_provider()/* XXX */)
+		//.set("executeCommandProvider", execute_command_provider()/* XXX */)
+		//.set("workspace", workspace()/* XXX */)
+		//.set("experimental", experimental()/* XXX */)
 		.get();
 }
 
@@ -667,6 +769,49 @@ json text_document_sync_options::to_json() const {
 json save_options::to_json() const {
 	return jbuild()
 		.set("includeText", include_text())
+		.get();
+}
+
+// CompletionOptions
+
+json completion_options::to_json() const {
+	return jbuild()
+		.set("resolveProvider", resolve_provider())
+		.set("triggerCharacters", trigger_characters())
+		.get();
+}
+
+// SignatureHelpOptions
+
+json signature_help_options::to_json() const {
+	return jbuild()
+		.set("triggerCharacters", trigger_characters())
+		.get();
+}
+
+// TextDocumentRegistrationOptions
+
+json text_document_registration_options::to_json() const {
+	return jbuild()
+		.opt_as_null("documentSelector", document_selector() | lift(vector_to_json))
+		.get();
+}
+
+// DocumentFilter
+
+json document_filter::to_json() const {
+	return jbuild()
+		.opt("language", language())
+		.opt("scheme", scheme())
+		.opt("pattern", pattern())
+		.get();
+}
+
+// StaticRegistrationOptions
+
+json static_registration_options::to_json() const {
+	return jbuild()
+		.opt("id", id())
 		.get();
 }
 

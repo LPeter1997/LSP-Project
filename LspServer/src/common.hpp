@@ -13,6 +13,7 @@
 #include <cassert>
 #include <functional>
 #include <optional>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include "json.hpp"
@@ -21,6 +22,17 @@
 #define lsp_panic(str) assert(false && str)
 #define lsp_unreachable lsp_panic("Unreachable code!")
 #define lsp_unimplemented lsp_panic("Unimplemented feature!")
+
+// Making functions overloaded
+#define FWD(...) \
+std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
+
+#define lift(x) 					\
+[](auto&&... args) 					\
+noexcept(noexcept(x(FWD(args)...))) \
+-> decltype(x(FWD(args)...)) { 		\
+	return x(FWD(args)...); 		\
+}
 
 namespace lsp {
 
