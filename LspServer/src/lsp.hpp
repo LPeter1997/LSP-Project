@@ -17,12 +17,15 @@ namespace lsp {
 
 struct initialize_params;
 struct initialize_result;
+struct did_open_text_document_params;
 
 /**
  * The interface that the language server object has to implement.
  */
 struct langserver {
-	virtual initialize_result on_initialize(initialize_params const&) = 0;
+	virtual initialize_result initialize(initialize_params const&) = 0;
+	virtual void on_initialized() { }
+	virtual void on_text_document_opened(did_open_text_document_params const&) = 0;
 };
 
 /**
@@ -919,6 +922,31 @@ struct initialize_result {
 	json to_json() const;
 
 	named_mem(server_capabilities, capabilities);
+};
+
+/**
+ * TextDocumentItem.
+ */
+struct text_document_item {
+	ctors(text_document_item);
+
+	static text_document_item from_json(json const& js);
+
+	named_mem(std::string, uri);
+	named_mem(std::string, language_id);
+	named_mem(i32, version);
+	named_mem(std::string, text);
+};
+
+/**
+ * DidOpenTextDocumentParams.
+ */
+struct did_open_text_document_params {
+	ctors(did_open_text_document_params);
+
+	static did_open_text_document_params from_json(json const& js);
+
+	named_mem(text_document_item, text_document);
 };
 
 #undef named_mem

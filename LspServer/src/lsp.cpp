@@ -93,7 +93,7 @@ void langserver_handler::next() {
 			auto init_params = initialize_params::from_json(req.params());
 			// XXX(LPeter1997): If parent process is null, exit
 			// XXX(LPeter1997): Handle init error?
-			auto init_result = m_Langserver->on_initialize(init_params);
+			auto init_result = m_Langserver->initialize(init_params);
 			auto response = req.reply(init_result.to_json());
 			m_Connection.write(response);
 			m_Initialized = true;
@@ -107,9 +107,31 @@ void langserver_handler::next() {
 			lsp_unimplemented;
 		}
 	}
+	else if (msg.is_notification()) {
+		auto const& noti = msg.as_notification();
+
+		if (noti.method() == "initialized") {
+			lsp_assert(m_Initialized);
+
+			m_Langserver->on_initialized();
+		}
+		else if (noti.method() == "textDocument/didOpen") {
+			auto param = did_open_text_document_params::from_json(noti.params());
+			m_Langserver->on_text_document_opened(param);
+		}
+		else {
+			std::cerr
+				<< "Unknown notification:"
+				<< std::endl
+				<< noti.to_json().dump(4)
+				<< std::endl;
+			lsp_unimplemented;
+		}
+	}
 	else {
+		lsp_assert(msg.is_response());
 		std::cerr
-			<< "Unknown message:"
+			<< "Unknown response:"
 			<< std::endl
 			<< msg.to_json().dump(4)
 			<< std::endl;
@@ -893,6 +915,27 @@ json server_capabilities::workspace_t::workspace_folders_t::to_json() const {
 		.set("supported", supported())
 		.set("changeNotifications", any_to_json(change_notifications()))
 		.get();
+}
+
+// TextDocumentItem
+
+text_document_item text_document_item::from_json(json const& js) {
+	auto jw = jwrap(js);
+	return text_document_item()
+		.uri(jw.get<std::string>("uri"))
+		.language_id(jw.get<std::string>("languageId"))
+		.version(jw.get<i32>("version"))
+		.text(jw.get<std::string>("text"))
+		;
+}
+
+// DidOpenTextDocumentParams
+
+did_open_text_document_params did_open_text_document_params::from_json(json const& js) {
+	auto jw = jwrap(js);
+	return did_open_text_document_params()
+		.text_document(text_document_item::from_json(jw.get("textDocument")))
+		;
 }
 
 } /* namespace lsp */
