@@ -200,10 +200,13 @@ json tuple_to_json(T&& t);
 // Generic to json
 template <typename T>
 json any_to_json(T&& val) {
-	// XXX(LPeter1997): Exclude string, numbers and such
 	using type = std::decay_t<T>;
 
-	if constexpr (detail::is_tuple_v<type>) {
+	if constexpr (std::is_integral_v<type> || std::is_same_v<type, std::string>) {
+		// Rely on implicit conversion
+		return json(std::forward<T>(val));
+	}
+	else if constexpr (detail::is_tuple_v<type>) {
 		return tuple_to_json(std::forward<T>(val));
 	}
 	else if constexpr (detail::is_variant_v<type>) {
@@ -738,18 +741,18 @@ json server_capabilities::to_json() const {
 		.set("documentHighlightProvider", document_highlight_provider())
 		.set("documentSymbolProvider", document_symbol_provider())
 		.set("workspaceSymbolProvider", workspace_symbol_provider())
-		.set("codeActionProvider", code_action_provider()/* XXX */)
-		.set("codeLensProvider", code_lens_provider()/* XXX */)
-		.set("documentFormattingProvider", document_formatting_provider()/* XXX */)
-		.set("documentRangeFormattingProvider", document_range_formatting_provider()/* XXX */)
-		.set("documentOnTypeFormattingProvider", document_on_type_formatting_provider()/* XXX */)
-		.set("renameProvider", rename_provider()/* XXX */)
-		.set("documentLinkProvider", document_link_provider()/* XXX */)
-		.set("colorProvider", color_provider()/* XXX */)
-		.set("foldingRangeProvider", folding_range_provider()/* XXX */)
-		.set("executeCommandProvider", execute_command_provider()/* XXX */)
-		.set("workspace", workspace()/* XXX */)
-		.set("experimental", experimental()/* XXX */)
+		.set("codeActionProvider", any_to_json(code_action_provider()))
+		.opt("codeLensProvider", code_lens_provider() | lift(any_to_json))
+		.set("documentFormattingProvider", document_formatting_provider())
+		.set("documentRangeFormattingProvider", document_range_formatting_provider())
+		.opt("documentOnTypeFormattingProvider", document_on_type_formatting_provider() | lift(any_to_json))
+		.set("renameProvider", any_to_json(rename_provider()))
+		.opt("documentLinkProvider", document_link_provider() | lift(any_to_json))
+		.set("colorProvider", any_to_json(color_provider()))
+		.set("foldingRangeProvider", any_to_json(folding_range_provider()))
+		.opt("executeCommandProvider", execute_command_provider() | lift(any_to_json))
+		.set("workspace", workspace().to_json())
+		.opt("experimental", experimental())
 		.get();
 }
 
@@ -821,6 +824,74 @@ json static_registration_options::to_json() const {
 json code_action_options::to_json() const {
 	return jbuild()
 		.set("codeActionKinds", vector_to_json(code_action_kinds()))
+		.get();
+}
+
+// CodeLensOptions
+
+json code_lens_options::to_json() const {
+	return jbuild()
+		.set("resolveProvider", resolve_provider())
+		.get();
+}
+
+// DocumentOnTypeFormattingOptions
+
+json document_on_type_formatting_options::to_json() const {
+	return jbuild()
+		.set("firstTriggerCharacter", first_trigger_character())
+		.set("moreTriggerCharacter", vector_to_json(more_trigger_character()))
+		.get();
+}
+
+// RenameOptions
+
+json rename_options::to_json() const {
+	return jbuild()
+		.set("prepareProvider", prepare_provider())
+		.get();
+}
+
+// DocumentLinkOptions
+
+json document_link_options::to_json() const {
+	return jbuild()
+		.set("resolveProvider", resolve_provider())
+		.get();
+}
+
+// ColorProviderOptions
+
+json color_provider_options::to_json() const {
+	return jbuild()
+		.get();
+}
+
+// FoldingRangeProviderOptions
+
+json folding_range_provider_options::to_json() const {
+	return jbuild()
+		.get();
+}
+
+// ExecuteCommandOptions
+
+json execute_command_options::to_json() const {
+	return jbuild()
+		.set("commands", vector_to_json(commands()))
+		.get();
+}
+
+json server_capabilities::workspace_t::to_json() const {
+	return jbuild()
+		.set("workspaceFolders", workspace_folders().to_json())
+		.get();
+}
+
+json server_capabilities::workspace_t::workspace_folders_t::to_json() const {
+	return jbuild()
+		.set("supported", supported())
+		.set("changeNotifications", any_to_json(change_notifications()))
 		.get();
 }
 
