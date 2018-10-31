@@ -75,8 +75,9 @@ connection::message_header connection::read_message_header() {
 rpc::message connection::read() {
 	auto h = read_message_header();
 	lsp_assert(h.content_length > 0);
-	auto content = std::make_unique<char[]>(h.content_length);
+	auto content = std::make_unique<char[]>(h.content_length + 1);
 	in().read(content.get(), h.content_length);
+	content[h.content_length] = '\0';
 	return rpc::message::parse(content.get());
 }
 
