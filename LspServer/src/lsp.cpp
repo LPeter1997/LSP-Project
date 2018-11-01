@@ -87,6 +87,7 @@ void langserver_handler::next() {
 		auto const& req = msg.as_request();
 
 		if (req.method() == "initialize") {
+			// XXX(LPeter1997): For notifications and requests there are special replies when uninitialized
 			if (m_Initialized) {
 				// XXX(LPeter1997): Send error
 				lsp_unimplemented;
@@ -119,6 +120,10 @@ void langserver_handler::next() {
 		else if (noti.method() == "textDocument/didOpen") {
 			auto param = did_open_text_document_params::from_json(noti.params());
 			m_Langserver->on_text_document_opened(param);
+		}
+		else if (noti.method() == "textDocument/didChange") {
+			auto param = did_change_text_document_params::from_json(noti.params());
+			m_Langserver->on_text_document_changed(param);
 		}
 		else {
 			std::cerr
@@ -936,6 +941,61 @@ did_open_text_document_params did_open_text_document_params::from_json(json cons
 	auto jw = jwrap(js);
 	return did_open_text_document_params()
 		.text_document(text_document_item::from_json(jw.get("textDocument")))
+		;
+}
+
+// DidChangeTextDocumentParams
+
+did_change_text_document_params did_change_text_document_params::from_json(json const& js) {
+	auto jw = jwrap(js);
+	return did_change_text_document_params()
+		.text_document(versioned_text_document_identifier::from_json(jw.get("textDocument")))
+		.content_changes(list(text_document_content_change_event::from_json)(jw.get("contentChanges")))
+		;
+}
+
+// VersionedTextDocumentIdentifier
+
+versioned_text_document_identifier versioned_text_document_identifier::from_json(json const& js) {
+	auto jw = jwrap(js);
+	return versioned_text_document_identifier()
+		.uri(jw.get<std::string>("uri"))
+		.version(null_to_opt<i32>(jw.get("version")))
+		;
+}
+
+// TextDocumentContentChangeEvent
+
+text_document_content_change_event text_document_content_change_event::from_json(json const& js) {
+	auto jw = jwrap(js);
+	return text_document_content_change_event()
+		.change_range(jw.opt("range") | range::from_json)
+		.range_length(def(jw.opt<i32>("rangeLength"), 0))
+		.text(jw.get<std::string>("text"))
+		;
+}
+
+bool text_document_content_change_event::full_content() const {
+	return !change_range().has_value();
+}
+
+// Range
+
+range range::from_json(json const& js) {
+	auto jw = jwrap(js);
+	return range()
+		.start(position::from_json(jw.get("start")))
+		.end(position::from_json(jw.get("end")))
+		;
+}
+
+// Position
+
+position position::from_json(json const& js) {
+	auto jw = jwrap(js);
+	return position()
+		.line(jw.get<i32>("line"))
+		.character(jw.get<i32>("character"))
 		;
 }
 

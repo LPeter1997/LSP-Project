@@ -18,6 +18,7 @@ namespace lsp {
 struct initialize_params;
 struct initialize_result;
 struct did_open_text_document_params;
+struct did_change_text_document_params;
 
 /**
  * The interface that the language server object has to implement.
@@ -26,6 +27,7 @@ struct langserver {
 	virtual initialize_result initialize(initialize_params const&) = 0;
 	virtual void on_initialized() { }
 	virtual void on_text_document_opened(did_open_text_document_params const&) = 0;
+	virtual void on_text_document_changed(did_change_text_document_params const&) = 0;
 };
 
 /**
@@ -947,6 +949,69 @@ struct did_open_text_document_params {
 	static did_open_text_document_params from_json(json const& js);
 
 	named_mem(text_document_item, text_document);
+};
+
+/**
+ * VersionedTextDocumentIdentifier.
+ */
+struct versioned_text_document_identifier {
+	ctors(versioned_text_document_identifier);
+
+	static versioned_text_document_identifier from_json(json const& js);
+
+	named_mem(std::string, uri);
+	named_mem(std::optional<i32>, version) = std::nullopt;
+};
+
+/**
+ * Position.
+ */
+struct position {
+	ctors(position);
+
+	static position from_json(json const& js);
+
+	named_mem(i32, line);
+	named_mem(i32, character);
+};
+
+/**
+ * Range.
+ */
+struct range {
+	ctors(range);
+
+	static range from_json(json const& js);
+
+	named_mem(position, start);
+	named_mem(position, end);
+};
+
+/**
+ * TextDocumentContentChangeEvent.
+ */
+struct text_document_content_change_event {
+	ctors(text_document_content_change_event);
+
+	static text_document_content_change_event from_json(json const& js);
+
+	bool full_content() const;
+
+	named_mem(std::optional<range>, change_range) = std::nullopt;
+	named_mem(i32, range_length) = 0;
+	named_mem(std::string, text);
+};
+
+/**
+ * DidChangeTextDocumentParams.
+ */
+struct did_change_text_document_params {
+	ctors(did_change_text_document_params);
+
+	static did_change_text_document_params from_json(json const& js);
+
+	named_mem(versioned_text_document_identifier, text_document);
+	named_mem(std::vector<text_document_content_change_event>, content_changes);
 };
 
 #undef named_mem

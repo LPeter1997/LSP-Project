@@ -19,7 +19,14 @@ struct my_server : public lsp::langserver {
 	}
 
 	void on_text_document_opened(lsp::did_open_text_document_params const& p) override {
-		std::cerr << "----- Content:" << std::endl << p.text_document().text() << std::endl;
+		std::cerr << "Opened with content: " << p.text_document().text() << std::endl;
+	}
+
+	void on_text_document_changed(lsp::did_change_text_document_params const& p) override {
+		std::cerr << "Change:" << std::endl;
+		for (auto const& c : p.content_changes()) {
+			std::cerr << " - " << c.text() << std::endl;
+		}
 	}
 };
 
