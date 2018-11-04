@@ -26,7 +26,7 @@ Maguk a továbbított üzenetek igen egyszerűek, egy fejrészből és egy tarta
 
 ## Célkitűzés
 Mivel nyelvet tervezek és implementálok, szeretnék tooling-ot faragni a nyelv köré. Sajnos egy félév nem elég egy teljeskörű nyelvi szerver kifejlesztésére, ezért valami alapvetőbb fícsör implementálását szeretném elérni. Első körben ez egy szintaxiskiemelés lenne, ami annyit jelent, hogy a nyelvi szerver kategorizálja a lexémákat az LSP által specifikált kategóriák egyikébe. Emellett sokat segíthet a zárójelpárok kiemelése, ezzel is szeretnék kísérletezni.
-Célom tehát egy nyelvi szerver elkészítése, hozzá pedig egy nyelvi kliens prezentációs célból. A nyelvi szervert szeretném oly módon elkészíteni, hogy a nem-nyelvi munkákat egy újrahasználható LSP librarybe lehessen kiemelni, így ha valaki egy nyelvi szervert szeretne készíteni, nem kell a meta-munkákkal (message dispatching, JSON parsing, stb) forglalkoznia.
+Célom tehát egy nyelvi szerver elkészítése, hozzá pedig egy nyelvi kliens prezentációs célból. A nyelvi szervert szeretném oly módon elkészíteni, hogy a nem-nyelvi munkákat egy újrahasználható LSP librarybe lehessen kiemelni, így ha valaki egy nyelvi szervert szeretne készíteni, nem kell a meta-munkákkal (message dispatching, JSON parsing, stb) foglalkoznia.
 
 ### A nyelv
 Szeretném a nyelv egy részhalmazával kezdeni, és onnan fölfele építeni. Fontosabb elemek a lexikális analízishez:
