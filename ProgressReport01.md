@@ -16,7 +16,7 @@ Egy LSP alapú kommunikáció 3 félből áll:
 Ahhoz, hogy az eltérő technológiákat áthidalják a szerkesztők, lehetőséget kell nyújtaniuk egy speciális plug-in, egy ún. nyelvi kliens (Language Client) megírására. Ezt az editor saját technológiáival kell implementáljuk és nincs más feladata, mint konfigurálni és elindítani a nyelvi szervert (Language Server). Ez általában egy 100 sor alatti kis program, Visual Studio-ban például egy Type-Script szkript, Emacs-ben pedig Emacs-LISP kód. Ezt ugyan minden editorhoz meg kell írjuk, de nagyon kicsi és általában mindenhol ugyanazt csinálja (konfigurálja hogy hogyan kommunikáljon a szerver és kliens, majd elindítja a szervert).
 
 ### Language Server
-A nyelvi szerver (Language Server) egy általunk megválasztott technológiával implementálható, független a fejlensztőkörnyezettől. Itt történik a visszajelzés készítése, kódkiegészítési lista konstruálása, stb. Ehhez a nyelvi kliens minden felhasználói interakciót (szöveg változik, kurzor lépett, stb) elküld a szervernek, ahol a szerver képes erre rengeteg módon reagálni (kiegészítések ajánlása, típushiba jelzése, lexémák változása, ...). A nyelvi szerver lehet például egy fordítóprogram, melynek a hibalistáit felhasználói visszajelzésekké fordítjuk.
+A nyelvi szerver (Language Server) egy általunk megválasztott technológiával implementálható, független a fejlesztőkörnyezettől. Itt történik a visszajelzés készítése, kódkiegészítési lista konstruálása, stb. Ehhez a nyelvi kliens minden felhasználói interakciót (szöveg változik, kurzor lépett, stb) elküld a szervernek, ahol a szerver képes erre rengeteg módon reagálni (kiegészítések ajánlása, típushiba jelzése, lexémák változása, ...). A nyelvi szerver lehet például egy fordítóprogram, melynek a hibalistáit felhasználói visszajelzésekké fordítjuk.
 
 ### A kommunikációs közeg
 A szerver és a kliens közötti közegnek mindössze szöveges üzeneteket kell továbbítania a két fél között, lehetséges páldául IPC, Pipe-ok vagy egyszerű STDIO.
@@ -37,7 +37,7 @@ Szeretném a nyelv egy részhalmazával kezdeni, és onnan fölfele építeni. F
  - Literálok
  - Egyéb elválasztók
 
-A nyelv szintaktiakilag nagyon hasonlít a [Rust](https://www.rust-lang.org) programnyelvhez, szemantikailag azonban igen kevés közös van bennük:
+A nyelv szintaktikailag nagyon hasonlít a [Rust](https://www.rust-lang.org) programnyelvhez, szemantikailag azonban igen kevés közös van bennük:
 ```Rust
 // Egy soros komment
 /*
@@ -50,7 +50,7 @@ fn sum(x: i32, y: i32) -> i32 {
 
 ### Választott technológiák
 #### Language Server
-A nyelvi szervert (csakúgy mint a fordítót) C++17-ben írom, CMake build generator-ral. JSON elemzéshez a  [nlohmann-féle JSON library](https://github.com/nlohmann)-t használom. A lexikális és szintaktikai elemzéshez nem használok kódgeneráló eszközöket (mint Lex/Flex és Yacc/Bison, bár ismerem és használtam is már), első sorban mert már implementálva vannak a fordítóban. A JSON-RPC-hez ugyan van library, de - az esetünkben -  3 üzenettípus megkülönböztetésére ez overkill-nek tűnt.
+A nyelvi szervert (csakúgy mint a fordítót) C++17-ben írom, CMake build generator-ral. JSON elemzéshez a  [nlohmann-féle JSON library](https://github.com/nlohmann)-t használom. A lexikális és szintaktikai elemzéshez nem használok kódgeneráló eszközöket (mint Lex/Flex és Yacc/Bison, bár ismerem és használtam is már), elsősorban mert már implementálva vannak a fordítóban. A JSON-RPC-hez ugyan van library, de - az esetünkben -  3 üzenettípus megkülönböztetésére ez overkill-nek tűnt.
 
 ### Language Client
 Sajnos scriptelés terén kissé hiányos a tudásom, ezért kis copy-paste kódolással sikeresen összeraktam egy Type-Script klienst [Visual Studio Code](https://code.visualstudio.com/)-hoz. Ha az időm úgy engedi, szeretnék egy régebbi editorhoz is (pl. Emacs) írni egyet, ezzel prezentálva hogy a komplex nyelvi szerver maga tényleg független az apró kliensektől.
@@ -63,7 +63,7 @@ A protokoll a [specifikációban](https://microsoft.github.io/language-server-pr
 A szerver már képes feldolgozni az inicializáciálásra felszólító üzenetet, illetve erre válaszol is. A dokumentumok változtatásánál szintén érkeznek notifikációk, melyben a változott szöveg tartalma is kiolvasható.
 
 ### A szerver interfész
-A nyelvi szervernek a köverkető interfészt kell implementálnia (bővülni fog, ez a jelenlegi állapot):
+A nyelvi szervernek a következő interfészt kell implementálnia (bővülni fog, ez a jelenlegi állapot):
 ```C++
 struct  langserver {
 	virtual initialize_result initialize(initialize_params const&) =  0;
