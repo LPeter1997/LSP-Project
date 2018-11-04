@@ -19,7 +19,7 @@ Ahhoz, hogy az eltérő technológiákat áthidalják a szerkesztők, lehetősé
 A nyelvi szerver (Language Server) egy általunk megválasztott technológiával implementálható, független a fejlesztőkörnyezettől. Itt történik a visszajelzés készítése, kódkiegészítési lista konstruálása, stb. Ehhez a nyelvi kliens minden felhasználói interakciót (szöveg változik, kurzor lépett, stb) elküld a szervernek, ahol a szerver képes erre rengeteg módon reagálni (kiegészítések ajánlása, típushiba jelzése, lexémák változása, ...). A nyelvi szerver lehet például egy fordítóprogram, melynek a hibalistáit felhasználói visszajelzésekké fordítjuk.
 
 ### A kommunikációs közeg
-A szerver és a kliens közötti közegnek mindössze szöveges üzeneteket kell továbbítania a két fél között, lehetséges páldául IPC, Pipe-ok vagy egyszerű STDIO.
+A szerver és a kliens közötti közegnek mindössze szöveges üzeneteket kell továbbítania a két fél között, lehetséges például IPC (Inter-Process Communication), Pipe-ok vagy egyszerű STDIO.
 
 ### Az üzenetek
 Maguk a továbbított üzenetek igen egyszerűek, egy fejrészből és egy tartalmi részből állnak. A fejrészben tartalmi részre vonatkozó információk vannak. Jelenleg összesen két dolog van itt specifikálva, a tartalmi rész hossza mező (kötelező), illetve a tartalmi rész kódolása mező (opcionális). A tartalmi rész egy JSON objektum, mely a [JSON-RPC 2.0](https://www.jsonrpc.org/specification)-ban specifikált _Request_, _Response_, vagy _Notification_ lehet.
