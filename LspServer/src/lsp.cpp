@@ -81,7 +81,13 @@ rpc::message connection::read() {
 	return rpc::message::parse(content.get());
 }
 
+template <typename V>
+json vector_to_json(V&& vec);
+
 void langserver_handler::next() {
+	// XXX(LPeter1997): Factor out patterns like request -> make reply -> fill -> to json -> write
+	// XXX(LPeter1997): assert lsp_assert(m_Initialized); everywhere where required
+
 	auto msg = m_Connection.read();
 	if (msg.is_request()) {
 		auto const& req = msg.as_request();
@@ -99,6 +105,12 @@ void langserver_handler::next() {
 			auto response = req.reply(init_result.to_json());
 			m_Connection.write(response);
 			m_Initialized = true;
+		}
+		else if (req.method() == "textDocument/documentHighlight") {
+			auto params = text_document_position_params::from_json(req.params());
+			auto res_list = m_Langserver->on_text_document_highlight(params);
+			auto response = req.reply(vector_to_json(res_list));
+			m_Connection.write(response);
 		}
 		else {
 			std::cerr
@@ -949,16 +961,16 @@ did_open_text_document_params did_open_text_document_params::from_json(json cons
 did_change_text_document_params did_change_text_document_params::from_json(json const& js) {
 	auto jw = jwrap(js);
 	return did_change_text_document_params()
-		.text_document(versioned_text_document_identifier::from_json(jw.get("textDocument")))
+		.text_document(text_document_identifier::from_json(jw.get("textDocument")))
 		.content_changes(list(text_document_content_change_event::from_json)(jw.get("contentChanges")))
 		;
 }
 
-// VersionedTextDocumentIdentifier
+// TextDocumentIdentifier
 
-versioned_text_document_identifier versioned_text_document_identifier::from_json(json const& js) {
+text_document_identifier text_document_identifier::from_json(json const& js) {
 	auto jw = jwrap(js);
-	return versioned_text_document_identifier()
+	return text_document_identifier()
 		.uri(jw.get<std::string>("uri"))
 		.version(null_to_opt<i32>(jw.get("version")))
 		;
@@ -989,6 +1001,13 @@ range range::from_json(json const& js) {
 		;
 }
 
+json range::to_json() const {
+	return jbuild()
+		.set("start", start().to_json())
+		.set("end", end().to_json())
+		.get();
+}
+
 // Position
 
 position position::from_json(json const& js) {
@@ -997,6 +1016,32 @@ position position::from_json(json const& js) {
 		.line(jw.get<i32>("line"))
 		.character(jw.get<i32>("character"))
 		;
+}
+
+json position::to_json() const {
+	return jbuild()
+		.set("line", line())
+		.set("character", character())
+		.get();
+}
+
+// TextDocumentPositionParams
+
+text_document_position_params text_document_position_params::from_json(json const& js) {
+	auto jw = jwrap(js);
+	return text_document_position_params()
+		.text_document(text_document_identifier::from_json(jw.get("textDocument")))
+		.document_position(position::from_json(jw.get("position")))
+		;
+}
+
+// DocumentHighlight
+
+json document_highlight::to_json() const {
+	return jbuild()
+		.set("range", highlight_range().to_json())
+		.set("kind", i32(kind()))
+		.get();
 }
 
 } /* namespace lsp */

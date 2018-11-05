@@ -15,6 +15,7 @@ struct my_server : public lsp::langserver {
 		return lsp::initialize_result()
 			.capabilities(lsp::server_capabilities()
 				.text_document_sync(lsp::text_document_sync_kind::full)
+				.document_highlight_provider(true)
 			);
 	}
 
@@ -27,6 +28,10 @@ struct my_server : public lsp::langserver {
 		for (auto const& c : p.content_changes()) {
 			std::cerr << " - " << c.text() << std::endl;
 		}
+	}
+
+	std::vector<lsp::document_highlight> on_text_document_highlight(lsp::text_document_position_params const& p) override {
+		return {};
 	}
 };
 

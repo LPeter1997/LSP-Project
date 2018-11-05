@@ -19,6 +19,8 @@ struct initialize_params;
 struct initialize_result;
 struct did_open_text_document_params;
 struct did_change_text_document_params;
+struct document_highlight;
+struct text_document_position_params;
 
 /**
  * The interface that the language server object has to implement.
@@ -28,6 +30,7 @@ struct langserver {
 	virtual void on_initialized() { }
 	virtual void on_text_document_opened(did_open_text_document_params const&) = 0;
 	virtual void on_text_document_changed(did_change_text_document_params const&) = 0;
+	virtual std::vector<document_highlight> on_text_document_highlight(text_document_position_params const&) = 0;
 };
 
 /**
@@ -192,6 +195,15 @@ enum class completion_item_kind {
 	event = 23,
 	operator_ = 24,
 	type_parameter = 25,
+};
+
+/**
+ * DocumentHighlightKind.
+ */
+enum class document_highlight_kind {
+	text = 1,
+	read = 2,
+	write = 3,
 };
 
 /**
@@ -952,12 +964,12 @@ struct did_open_text_document_params {
 };
 
 /**
- * VersionedTextDocumentIdentifier.
+ * TextDocumentIdentifier.
  */
-struct versioned_text_document_identifier {
-	ctors(versioned_text_document_identifier);
+struct text_document_identifier {
+	ctors(text_document_identifier);
 
-	static versioned_text_document_identifier from_json(json const& js);
+	static text_document_identifier from_json(json const& js);
 
 	named_mem(std::string, uri);
 	named_mem(std::optional<i32>, version) = std::nullopt;
@@ -971,6 +983,8 @@ struct position {
 
 	static position from_json(json const& js);
 
+	json to_json() const;
+
 	named_mem(i32, line);
 	named_mem(i32, character);
 };
@@ -982,6 +996,8 @@ struct range {
 	ctors(range);
 
 	static range from_json(json const& js);
+
+	json to_json() const;
 
 	named_mem(position, start);
 	named_mem(position, end);
@@ -1010,8 +1026,32 @@ struct did_change_text_document_params {
 
 	static did_change_text_document_params from_json(json const& js);
 
-	named_mem(versioned_text_document_identifier, text_document);
+	named_mem(text_document_identifier, text_document);
 	named_mem(std::vector<text_document_content_change_event>, content_changes);
+};
+
+/**
+ * TextDocumentPositionParams.
+ */
+struct text_document_position_params {
+	ctors(text_document_position_params);
+
+	static text_document_position_params from_json(json const& js);
+
+	named_mem(text_document_identifier, text_document);
+	named_mem(position, document_position);
+};
+
+/**
+ * DocumentHighlight.
+ */
+struct document_highlight {
+	ctors(document_highlight);
+
+	json to_json() const;
+
+	named_mem(range, highlight_range);
+	named_mem(document_highlight_kind, kind) = document_highlight_kind::text;
 };
 
 #undef named_mem
