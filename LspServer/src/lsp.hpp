@@ -981,6 +981,8 @@ struct text_document_identifier {
 struct position {
 	ctors(position);
 
+	position(i32 ln, i32 ch);
+
 	static position from_json(json const& js);
 
 	json to_json() const;
@@ -994,6 +996,8 @@ struct position {
  */
 struct range {
 	ctors(range);
+
+	range(position const& st, position const& en);
 
 	static range from_json(json const& js);
 

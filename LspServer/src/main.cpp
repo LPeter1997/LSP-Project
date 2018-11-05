@@ -31,7 +31,10 @@ struct my_server : public lsp::langserver {
 	}
 
 	std::vector<lsp::document_highlight> on_text_document_highlight(lsp::text_document_position_params const& p) override {
-		return {};
+		return {
+			lsp::document_highlight()
+				.highlight_range(lsp::range(lsp::position(0, 0), lsp::position(0, 1)))
+		};
 	}
 };
 

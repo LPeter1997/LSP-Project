@@ -972,7 +972,7 @@ text_document_identifier text_document_identifier::from_json(json const& js) {
 	auto jw = jwrap(js);
 	return text_document_identifier()
 		.uri(jw.get<std::string>("uri"))
-		.version(null_to_opt<i32>(jw.get("version")))
+		.version(jw.opt("version") | lift(null_to_opt))
 		;
 }
 
@@ -993,6 +993,10 @@ bool text_document_content_change_event::full_content() const {
 
 // Range
 
+range::range(position const& st, position const& en)
+	: m_start(st), m_end(en) {
+}
+
 range range::from_json(json const& js) {
 	auto jw = jwrap(js);
 	return range()
@@ -1009,6 +1013,10 @@ json range::to_json() const {
 }
 
 // Position
+
+position::position(i32 ln, i32 ch)
+	: m_line(ln), m_character(ch) {
+}
 
 position position::from_json(json const& js) {
 	auto jw = jwrap(js);
