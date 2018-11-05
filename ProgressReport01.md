@@ -78,4 +78,4 @@ Sajnos a C++ -ból hiányzik a reflection, így a nem-típusos JSON üzeneteket 
 Emiatt csak részleges automatizmust csináltam (Ruby scriptekkel osztály és szerializációs függvény vázakat generáltam).
 
 ### Kód szépség
-A kód jelenleg közel sem olyan szép mint szeretném. A szerializációs kód valószínűleg nem is lehet szebb, igyekszem kifaktorálni később külön file-okba, így könnyebb lesz a tényleges logika refaktozálása is.
+A kód jelenleg közel sem olyan szép mint szeretném. A szerializációs kód valószínűleg nem is lehet szebb, igyekszem kifaktorálni később külön file-okba, így könnyebb lesz a tényleges logika refaktorálása is.
