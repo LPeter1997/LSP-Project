@@ -28,3 +28,42 @@ std::transform(std::begin(nums), std::end(nums), std::back_inserter(result), lif
 // lift() nélkül:
 // std::transform(std::begin(nums), std::end(nums), std::back_inserter(result), duplicate<std::complex<double>>);
 ```
+
+## Named Parameter Idiom
+Sok nyelvben lehet a paramétereket névhez kötni pozíció helyett. Ez sok, vagy hasonló paramétereknél előnyös, hiszen nem cserélünk fel azonos típusú paramétereket:
+```C#
+var v1 = matrix.GetElement(3, 4); // Ez most row-major vagy column-major?
+var v2 = matrix.GetElement(row: 3, column: 4);
+```
+
+Sajnos a C++ nem ad erre lehetőséget és a [proposal-t](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4172.htm) már régen elvetették C-ben gyökerező problémák miatt. Részben megoldás lehet a C++20 -os [designated initializer proposal](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0329r0.pdf), melyet a C99-es fícsör ihletett.
+
+Az LSP sok JSON adatot kíván meg, ahol a mappelt struktúrák konstruktora helyenként akár 20 paramétert is megkíván, helyenként default-olható memberekkel. Egyszerű setterek helyett azonban úgy döntöttem, hogy a C++ egy ritkán használt mintáját próbálom ki, a - sokak által nem kedvelt - [named parameter idiom-ot](https://marcoarena.wordpress.com/2014/12/16/bring-named-parameters-in-modern-cpp/). A minta egyszerű:
+```c++
+struct person {
+	template <typename T>
+	person& name(T&& n) {
+		m_Name = std::forward<T>(n);
+		return *this;
+	}
+
+	template <typename T>
+	person& age(T&& n) {
+		m_Age = std::forward<T>(n);
+		return *this;
+	}
+
+private:
+	std::string m_Name;
+	std::uint8_t m_Age;
+};
+
+// Használat
+auto p = person()
+	.name("John")
+	.age(35);
+```
+
+Ehhez természetesen egy getter is szükséges, és a triviális esetekre érdemes lehet makrót írni.
+
+**Note:** _Bár úgy tűnhet, hogy az Objektum-Orientált enkapszuláció így sérül - hisz a getter-setter pár ugyanaz, mintha publikus lenne a member -, azonban ezt a mintát csak [DTO](https://en.wikipedia.org/wiki/Data_transfer_object)-khoz (Data Transfer Object) használom, melyeknek általános megjelenése például C#-ban egy osztály csupa publikus property-vel. DTO-knál a data-class code-smell és enkapszuláció ilyen módon sérthető._
