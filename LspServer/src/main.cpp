@@ -30,6 +30,10 @@ struct my_server : public lsp::langserver {
 		}
 	}
 
+	void on_text_document_saved(lsp::did_save_text_document_params const& p) override {
+		std::cerr << "Saved " << p.text_document().uri() << '!' << std::endl;
+	}
+
 	std::vector<lsp::document_highlight> on_text_document_highlight(lsp::text_document_position_params const& p) override {
 		return {
 			lsp::document_highlight()

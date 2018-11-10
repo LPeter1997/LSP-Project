@@ -133,6 +133,10 @@ void langserver_handler::next() {
 			auto param = did_open_text_document_params::from_json(noti.params());
 			m_Langserver->on_text_document_opened(param);
 		}
+		else if (noti.method() == "textDocument/didSave") {
+			auto param = did_save_text_document_params::from_json(noti.params());
+			m_Langserver->on_text_document_saved(param);
+		}
 		else if (noti.method() == "textDocument/didChange") {
 			auto param = did_change_text_document_params::from_json(noti.params());
 			m_Langserver->on_text_document_changed(param);
@@ -1050,6 +1054,16 @@ json document_highlight::to_json() const {
 		.set("range", highlight_range().to_json())
 		.set("kind", i32(kind()))
 		.get();
+}
+
+// DidSaveTextDocumentParams
+
+did_save_text_document_params did_save_text_document_params::from_json(json const& js) {
+	auto jw = jwrap(js);
+	return did_save_text_document_params()
+		.text_document(text_document_identifier::from_json(jw.get("textDocument")))
+		.text(jw.opt<std::string>("text"))
+		;
 }
 
 } /* namespace lsp */

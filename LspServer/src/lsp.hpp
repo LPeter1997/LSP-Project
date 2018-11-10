@@ -21,6 +21,7 @@ struct did_open_text_document_params;
 struct did_change_text_document_params;
 struct document_highlight;
 struct text_document_position_params;
+struct did_save_text_document_params;
 
 /**
  * The interface that the language server object has to implement.
@@ -30,6 +31,7 @@ struct langserver {
 	virtual void on_initialized() { }
 	virtual void on_text_document_opened(did_open_text_document_params const&) = 0;
 	virtual void on_text_document_changed(did_change_text_document_params const&) = 0;
+	virtual void on_text_document_saved(did_save_text_document_params const&) = 0;
 	virtual std::vector<document_highlight> on_text_document_highlight(text_document_position_params const&) = 0;
 };
 
@@ -1056,6 +1058,18 @@ struct document_highlight {
 
 	named_mem(range, highlight_range);
 	named_mem(document_highlight_kind, kind) = document_highlight_kind::text;
+};
+
+/**
+ * DidSaveTextDocumentParams.
+ */
+struct did_save_text_document_params {
+	ctors(did_save_text_document_params);
+
+	static did_save_text_document_params from_json(json const& js);
+
+	named_mem(text_document_identifier, text_document);
+	named_mem(std::optional<std::string>, text) = std::nullopt;
 };
 
 #undef named_mem
