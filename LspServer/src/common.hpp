@@ -9,8 +9,8 @@
 #ifndef LSP_COMMON_HPP
 #define LSP_COMMON_HPP
 
-#include <cstdint>
 #include <cassert>
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <tuple>
