@@ -8,7 +8,7 @@ Mielőtt interakciókat tudnánk leírni a kliens és szerver között, meg kell
 
 ### A klasszikus fordítási modell
 Néhány extrémet leszámítva a mai fordítók nagyjából ugyanazt a fordítási modellt követik:
-**<kép ide>**
+![A fordítás folyamata](./CompilationProcess.svg)
 
 Manapság divat a backend részleget egy létező megoldásra, leggyakoribb esetben például az [LLVM](https://llvm.org/)-re hagyni.
 
