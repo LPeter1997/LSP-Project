@@ -4,6 +4,96 @@
 
 namespace yk {
 
+bool operator==(position const& a, position const& b) {
+	return a.row() == b.row() && a.column() == b.column();
+}
+
+bool operator!=(position const& a, position const& b) {
+	return !(a == b);
+}
+
+bool operator<(position const& a, position const& b) {
+	return (a.row() < b.row())
+		|| ((a.row() == b.row()) && (a.column() < b.column()));
+}
+
+bool operator<=(position const& a, position const& b) {
+	return (a == b) || (a < b);
+}
+
+bool operator>(position const& a, position const& b) {
+	return !(a <= b);
+}
+
+bool operator>=(position const& a, position const& b) {
+	return !(a < b);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool operator==(range const& a, range const& b) {
+	return (a.start() == b.start()) && (a.end() == b.end());
+}
+
+bool operator!=(range const& a, range const& b) {
+	return !(a == b);
+}
+
+/**
+ * Note: The four operations below are not real comparsions for ranges that can
+ * include other ranges.
+ */
+
+bool operator<(range const& a, range const& b) {
+	return a.start() < b.start();
+}
+
+bool operator<=(range const& a, range const& b) {
+	return a.start() <= b.start();
+}
+
+bool operator>(range const& a, range const& b) {
+	return a.start() > b.start();
+}
+
+bool operator>=(range const& a, range const& b) {
+	return a.start() >= b.start();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+static u32 calculate_length(token::type_t ty, std::string const& val) {
+	switch (ty) {
+	case token::EndOfFile:
+		return 0;
+
+	case token::LeftParen:
+	case token::RightParen:
+	case token::LeftBrace:
+	case token::RightBrace:
+	case token::Colon:
+		return 1;
+
+	case token::Keyword_Fn:
+		return 2;
+
+	case token::Identifier:
+	case token::Integer:
+		return val.length();
+	}
+
+	yk_unreachable;
+}
+
+range
+token::calculate_range(position const& pos, type_t ty, std::string const& val) {
+	auto pos2 = pos;
+	pos2.advance(calculate_length(ty, val));
+	return range(pos, pos2);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 std::vector<token> lexer::all(char const* src) {
 	auto result = std::vector<token>();
 	auto lex = lexer(src);
@@ -27,18 +117,20 @@ bool lexer::is_eof() const {
 bool lexer::parse_newline() {
 	if (m_Source[0] == '\n') {
 		// UNIX-style newline
-		advance();
+		++m_Source;
+		m_Position.newline();
 		return true;
 	}
 	else if (m_Source[0] == '\r') {
 		if (m_Source[1] == '\n') {
 			// Windows-style newline
-			advance(2);
+			m_Source += 2;
 		}
 		else {
 			// OS-X 9-style newline
-			advance();
+			++m_Source;
 		}
+		m_Position.newline();
 		return true;
 	}
 	else {

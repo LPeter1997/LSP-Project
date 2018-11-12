@@ -9,6 +9,7 @@
 #ifndef LEXER_HPP
 #define LEXER_HPP
 
+#include <algorithm>
 #include <string>
 #include <vector>
 #include "common.hpp"
@@ -69,6 +70,50 @@ private:
 	u32 m_Col; // Column (x) number, 0 based.
 };
 
+bool operator==(position const& a, position const& b);
+bool operator!=(position const& a, position const& b);
+bool operator<(position const& a, position const& b);
+bool operator<=(position const& a, position const& b);
+bool operator>(position const& a, position const& b);
+bool operator>=(position const& a, position const& b);
+
+/**
+ * Represents a positional range in a file.
+ */
+struct range {
+	/**
+	 * Creates a range from a pair of positions.
+	 * @param from The starting position of the range. (inclusive)
+	 * @param to The ending position of the range. (exclusive)
+	 */
+	range(position const& from, position const& to)
+		: m_From(from), m_To(to) {
+	}
+
+	position const& start() const { return m_From; }
+	position const& end() const { return m_To; }
+
+	/**
+	 * Checks if the range contains a given point.
+	 * @param p The point to check if it's in the range.
+	 * @return True, if the point is in the range.
+	 */
+	bool includes(position const& p) const {
+		return (start() <= p) && (p < end());
+	}
+
+private:
+	position m_From; // Inclusive
+	position m_To; // Exclusive
+};
+
+bool operator==(range const& a, range const& b);
+bool operator!=(range const& a, range const& b);
+bool operator<(range const& a, range const& b);
+bool operator<=(range const& a, range const& b);
+bool operator>(range const& a, range const& b);
+bool operator>=(range const& a, range const& b);
+
 /**
  * The atomic result of the lexical analysis.
  */
@@ -101,15 +146,32 @@ struct token {
 	 * semantic information, like numbers and identifiers. Empty by default.
 	 */
 	explicit token(position const& pos, type_t ty, std::string&& val = "")
-		: m_Position(pos), m_Type(ty), m_Value(std::move(val)) {
+		: m_Range(calculate_range(pos, ty, val)),
+		m_Type(ty), m_Value(std::move(val)) {
 	}
 
-	position const& pos() const { return m_Position; }
+	range const& range_() const { return m_Range; }
+	position const& start() const { return range_().start(); }
+	position const& end() const { return range_().end(); }
 	type_t const& type() const { return m_Type; }
 	std::string const& value() const { return m_Value; }
 
+	/**
+	 * Gets the length of the token.
+	 * @return The (horizontal) length of the token in characters.
+	 */
+	u32 length() const {
+		yk_assert(start().row() == end().row());
+		yk_assert(start().column() <= end().column());
+
+		return end().column() - start().column();
+	}
+
 private:
-	position m_Position;
+	static range
+	calculate_range(position const& pos, type_t ty, std::string const& val);
+
+	range m_Range;
 	type_t m_Type;
 	std::string m_Value;
 };
@@ -124,6 +186,27 @@ struct lexer {
 	 * @return A vector of tokens.
 	 */
 	static std::vector<token> all(char const* src);
+
+	/**
+	 * Utility to find a token at a given position.
+	 * @param first The beginning of the range to search in.
+	 * @param last The end of the range to search in.
+	 * @param pos The position to find the token at.
+	 * @return The iterator to the token, or the last element if not found.
+	 */
+	template <typename It>
+	static It find_token_at(It first, It last, position const& pos) {
+		first = std::upper_bound(first, last, pos,
+		[](position const& p, token const& tok) {
+			return tok.end() > p;
+		});
+		if (first != last) {
+			if (first->range_().includes(pos)) {
+				return first;
+			}
+		}
+		return last;
+	}
 
 	/**
 	 * Creates a lexer for a given source text.
