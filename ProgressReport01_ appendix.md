@@ -10,6 +10,33 @@ int negate(int x) { return -x }
 auto result = std::make_optional(1) | add_two | negate;
 ```
 
+## Sum type-ok
+Az [ADT](https://en.wikipedia.org/wiki/Algebraic_data_type)-k (Algebraic Data Type) egyike az ún. [sum-type](https://en.wikipedia.org/wiki/Tagged_union) vagy másnéven tagged-union. Implementációja a Boost-ban már régóta van, az STL-be csak a C++17-ben érkezett [std::variant](https://en.cppreference.com/w/cpp/utility/variant)-ként.
+
+Vannak esetek, mikor előnyösebb típusok "összegeként" ábrázolni egy absztrakt típust minthogy öröklési hierarchiát alakítunk ki. Ilyen például az [AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree) (Abstract Syntax Tree), melyet a fordítónak többször is be kell járnia aa folyamat során. Teletömni az őst virtuális [visitor](https://en.wikipedia.org/wiki/Visitor_pattern) függvényekkel, melyeket minden altípusban utána felül kell írni elég fáradságos. Új típust még viszonylag könnyű hozzáadni, de egy új vizitálást annál nehezebb. Ez a probléma analóg az ún. [Expression problémával](https://en.wikipedia.org/wiki/Expression_problem).
+
+Az összeg típusok - bár nem oldják meg, csak megfordítják a problémát - ebben az esetben pont előnyösek lesznek, nagyon könnyű lesz visitort írni anélkül, hogy az AST csomópontokon változtatni kéne.
+
+Az STL sajnos egy elég kényelmetlen vizitáló mechanizmust nyújt az std::visit-tel, de Vittorio Romeo [egyik előadásában](https://www.youtube.com/watch?v=mqei4JJRQ7s) prezentált egy - a funkcionális nyelveket megközelítő szintaxisú - [wrappert](https://vittorioromeo.info/index/blog/variants_lambdas_part_1.html), mely kényelmesebbé teszi a vizitálást. Példa használatra (egyszerűsített type-checker összeadásra):
+```c++
+struct integer {};
+struct real {};
+struct string {};
+
+using type = std::variant<string, integer, real>;
+
+type check_addition(type const& left, type const& right) {
+	return match(left, right)(
+		[](integer const&, integer const&) -> type { return integer{};   }, // int + int : int
+		[](real const&,    real const&)    -> type { return real{};      }, // real + real : real
+		[](integer const&, real const&)    -> type { return real{};      }, // int + real : real
+		[](real const&,    integer const&) -> type { return real{};      }, // real + int : int
+		[](string const&,  string const&)  -> type { return string{};    }, // string + string : string
+		[](auto const&, auto const&)       -> type { throw type_error(); }  // Bármi más type error
+	);
+}
+```
+
 ## Overload set-ek
 Függvény overload halmazt átadni szabad (free) függvényekből nehézkes, pedig gyakran szükség lehet rá. Funktorba/objektumba emeléshez standard módszer még nincs ([proposal](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0834r0.html)). Hasonló a helyzet, ha egy template függvényt szeretnénk átadni, ugyanis specifikálni kell a típust még akkor is, ha ez a type inference miatt redundáns. Ehhez definiáltam egy `lift` makrót, mely az összes overload-ot egy funktor - a gyakorlatban lambda - alá gyűjti. Használatra példa:
 ```c++
