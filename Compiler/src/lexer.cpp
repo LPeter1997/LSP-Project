@@ -80,6 +80,10 @@ static u32 calculate_length(token::type_t ty, std::string const& val) {
 	case token::Identifier:
 	case token::Integer:
 		return val.length();
+
+	case token::LineComment:
+	case token::NestedComment:
+		yk_panic("A comment should not be asked about it's length!");
 	}
 
 	yk_unreachable;
@@ -174,6 +178,77 @@ token lexer::next() {
 		}
 
 		switch (m_Source[0]) {
+		case '/': {
+			if (m_Source[1] == '/') {
+				// Line comment
+				// We don't actually need to keep track of positioning, that's
+				// why we modify the source directly
+				auto beg_pos = m_Position;
+				advance(2);
+				auto end_pos = m_Position;
+				while (true) {
+					if (is_eof()) {
+						break;
+					}
+					else if (parse_newline()) {
+						break;
+					}
+					else if (std::isgraph(m_Source[0])
+						|| std::isblank(m_Source[0])) {
+						// Visual
+						advance(1);
+						end_pos = m_Position;
+					}
+					else {
+						// Non-visual
+						++m_Source;
+					}
+				}
+				return token(range(beg_pos, end_pos), token::LineComment);
+			}
+			else if (m_Source[1] == '*') {
+				// Nested comment
+				// Positioning is important here, as nested comments can end in
+				// the middle of the line, where more code follows. For the
+				// actual code we need those token positions correctly.
+				auto beg_pos = m_Position;
+				advance(2);
+
+				// We will use a counter instead of a stack, using a stack to
+				// keep track of nesting would be a huge overkill.
+				u32 depth = 1;
+				while (depth > 0) {
+					if (is_eof()) {
+						// XXX(LPeter1997): Error here
+						break;
+					}
+					else if (parse_newline()) {
+						// Do nothing
+					}
+					else if (m_Source[0] == '/' && m_Source[1] == '*') {
+						// Nest
+						advance(2);
+						++depth;
+					}
+					else if (m_Source[0] == '*' && m_Source[1] == '/') {
+						// Un-nest
+						advance(2);
+						--depth;
+					}
+					else if (std::isgraph(m_Source[0])
+						|| std::isblank(m_Source[0])) {
+						// Occupies space, advance in position
+						advance(1);
+					}
+					else {
+						// Some control character
+						++m_Source;
+					}
+				}
+				return token(range(beg_pos, m_Position), token::NestedComment);
+			}
+		} break;
+
 		case '(': return make_simple(token::LeftParen);
 		case ')': return make_simple(token::RightParen);
 
@@ -210,7 +285,7 @@ token lexer::next() {
 		// Unknown
 		if (std::isgraph(m_Source[0])) {
 			// Only error if a visible character
-			yk_panic("Unknown token!");
+			// XXX(LPeter1997): Unknown token error
 			advance();
 		}
 		else {

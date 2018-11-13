@@ -3,6 +3,28 @@
 #include "lsp.hpp"
 #include "lexer.hpp"
 
+static lsp::position yk_to_lsp(yk::position const& p) {
+	return lsp::position(p.row(), p.column());
+}
+
+static lsp::range yk_to_lsp(yk::range const& r) {
+	return lsp::range(
+		yk_to_lsp(r.start()),
+		yk_to_lsp(r.end())
+	);
+}
+
+static yk::position lsp_to_yk(lsp::position const& p) {
+	return yk::position::row_col(p.line(), p.character());
+}
+
+static yk::range lsp_to_yk(lsp::range const& r) {
+	return yk::range(
+		lsp_to_yk(r.start()),
+		lsp_to_yk(r.end())
+	);
+}
+
 struct my_server : public lsp::langserver {
 	lsp::initialize_result initialize(lsp::initialize_params const& p) override {
 		if (p.process_id()) {
@@ -21,7 +43,11 @@ struct my_server : public lsp::langserver {
 	}
 
 	void on_text_document_opened(lsp::did_open_text_document_params const& p) override {
-		std::cerr << "Opened with content: " << p.text_document().text() << std::endl;
+		m_Tokens = yk::lexer::all(p.text_document().text().c_str());
+		std::cerr << "Tokens: " << std::endl;
+		for (auto const& t : m_Tokens) {
+			std::cerr << "  [" << t.start().row() << " :: " << t.start().column() << " - " << t.end().column() << "] - '" << t.value() << "'" << std::endl;
+		}
 	}
 
 	void on_text_document_changed(lsp::did_change_text_document_params const& p) override {
@@ -42,7 +68,7 @@ struct my_server : public lsp::langserver {
 
 	std::vector<lsp::document_highlight> on_text_document_highlight(lsp::text_document_position_params const& p) override {
 		auto const& doc_pos = p.document_position();
-		auto click_pos = yk::position::row_col(doc_pos.line(), doc_pos.character());
+		auto click_pos = lsp_to_yk(doc_pos);
 		auto clicked_tok = yk::lexer::find_token_at(std::begin(m_Tokens), std::end(m_Tokens), click_pos);
 		if (clicked_tok == std::end(m_Tokens)) {
 			std::cerr << "Clicked on emptyness!" << std::endl;
@@ -50,16 +76,9 @@ struct my_server : public lsp::langserver {
 		}
 		auto const& tok = *clicked_tok;
 		std::cerr << "Clicked on: " << yk::u32(tok.type()) << " - '" << tok.value() << "'" << std::endl;
-		if (tok.type() == yk::token::LeftBrace) {
-			std::cerr << "Clicked a left-brace!" << std::endl;
-		}
-		return {};
-		/*
 		return {
-			lsp::document_highlight()
-				.highlight_range(lsp::range(lsp::position(0, 0), lsp::position(0, 1)))
+			lsp::document_highlight().highlight_range(yk_to_lsp(tok.range_()))
 		};
-		*/
 	}
 
 private:

@@ -122,15 +122,17 @@ struct token {
 	 * The normalized token types that the parser can work with.
 	 */
 	enum type_t {
-		EndOfFile,	// EOF
-		LeftParen,	// '('
-		RightParen,	// ')'
-		LeftBrace,	// '{'
-		RightBrace,	// '}'
-		Colon,		// ':'
-		Keyword_Fn,	// 'fn'
-		Identifier,	// [A-Za-z_][A-Za-z0-9_]*
-		Integer,	// [0-9]+
+		EndOfFile,			// EOF
+		LineComment,		// //[^<newline>]*
+		NestedComment,		// /*<recurse>*/
+		LeftParen,			// '('
+		RightParen,			// ')'
+		LeftBrace,			// '{'
+		RightBrace,			// '}'
+		Colon,				// ':'
+		Keyword_Fn,			// 'fn'
+		Identifier,			// [A-Za-z_][A-Za-z0-9_]*
+		Integer,			// [0-9]+
 	};
 
 	token(token const&) = default;
@@ -146,8 +148,18 @@ struct token {
 	 * semantic information, like numbers and identifiers. Empty by default.
 	 */
 	explicit token(position const& pos, type_t ty, std::string&& val = "")
-		: m_Range(calculate_range(pos, ty, val)),
-		m_Type(ty), m_Value(std::move(val)) {
+		: token(calculate_range(pos, ty, val), ty, std::move(val)) {
+	}
+
+	/**
+	 * Creates a token.
+	 * @param r The range of the token.
+	 * @param ty The type of the token.
+	 * @param val The textual value of the token. Only required if it contains
+	 * semantic information, like numbers and identifiers. Empty by default.
+	 */
+	explicit token(range const& r, type_t ty, std::string&& val = "")
+		: m_Range(r), m_Type(ty), m_Value(std::move(val)) {
 	}
 
 	range const& range_() const { return m_Range; }
