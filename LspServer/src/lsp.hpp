@@ -22,6 +22,8 @@ struct did_change_text_document_params;
 struct document_highlight;
 struct text_document_position_params;
 struct did_save_text_document_params;
+struct folding_range_params;
+struct folding_range;
 
 /**
  * The interface that the language server object has to implement.
@@ -33,6 +35,7 @@ struct langserver {
 	virtual void on_text_document_changed(did_change_text_document_params const&) = 0;
 	virtual void on_text_document_saved(did_save_text_document_params const&) = 0;
 	virtual std::vector<document_highlight> on_text_document_highlight(text_document_position_params const&) = 0;
+	virtual std::vector<folding_range> on_folding_range(folding_range_params const&) = 0;
 };
 
 /**
@@ -215,6 +218,15 @@ enum class text_document_sync_kind {
 	none = 0,
 	full = 1,
 	incremental = 2,
+};
+
+/**
+ * FoldingRangeKind.
+ */
+enum class folding_range_kind {
+	comment,
+	imports,
+	region,
 };
 
 /**
@@ -1070,6 +1082,37 @@ struct did_save_text_document_params {
 
 	named_mem(text_document_identifier, text_document);
 	named_mem(std::optional<std::string>, text) = std::nullopt;
+};
+
+/**
+ * FoldingRangeParams.
+ */
+struct folding_range_params {
+	ctors(folding_range_params);
+
+	static folding_range_params from_json(json const& js);
+
+	named_mem(text_document_identifier, text_document);
+};
+
+/**
+ * FoldingRange.
+ */
+struct folding_range {
+	ctors(folding_range);
+
+	json to_json() const;
+
+	folding_range& start(position const& pos);
+	folding_range& end(position const& pos);
+
+	folding_range& fold_range(range const& r);
+
+	named_mem(i32, start_line);
+	named_mem(std::optional<i32>, start_character) = std::nullopt;
+	named_mem(i32, end_line);
+	named_mem(std::optional<i32>, end_character) = std::nullopt;
+	named_mem(std::optional<folding_range_kind>, kind) = std::nullopt;
 };
 
 #undef named_mem

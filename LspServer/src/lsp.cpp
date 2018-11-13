@@ -112,6 +112,12 @@ void langserver_handler::next() {
 			auto response = req.reply(vector_to_json(res_list));
 			m_Connection.write(response);
 		}
+		else if (req.method() == "textDocument/foldingRange") {
+			auto params = folding_range_params::from_json(req.params());
+			auto fold_list = m_Langserver->on_folding_range(params);
+			auto response = req.reply(vector_to_json(fold_list));
+			m_Connection.write(response);
+		}
 		else {
 			std::cerr
 				<< "Unknown request:"
@@ -372,6 +378,17 @@ text_document_sync_kind to_text_document_sync_kind(i32 num) {
 	lsp_assert(num >= 0 && num <= 2);
 
 	return text_document_sync_kind(num);
+}
+
+// FoldingRangeKind
+
+std::string folding_range_kind_to_json(folding_range_kind f) {
+	switch (f) {
+	case folding_range_kind::comment: return "comment";
+	case folding_range_kind::imports: return "imports";
+	case folding_range_kind::region: return "region";
+	}
+	lsp_unreachable;
 }
 
 // WorkspaceFolder
@@ -1064,6 +1081,45 @@ did_save_text_document_params did_save_text_document_params::from_json(json cons
 		.text_document(text_document_identifier::from_json(jw.get("textDocument")))
 		.text(jw.opt<std::string>("text"))
 		;
+}
+
+// FoldingRangeParams
+
+folding_range_params folding_range_params::from_json(json const& js) {
+	auto jw = jwrap(js);
+	return folding_range_params()
+		.text_document(text_document_identifier::from_json(jw.get("textDocument")))
+		;
+}
+
+// FoldingRange
+
+folding_range& folding_range::start(position const& pos) {
+	return
+		start_line(pos.line())
+		.start_character(pos.character());
+}
+
+folding_range& folding_range::end(position const& pos) {
+	return
+		end_line(pos.line())
+		.end_character(pos.character());
+}
+
+folding_range& folding_range::fold_range(range const& r) {
+	return
+		start(r.start())
+		.end(r.end());
+}
+
+json folding_range::to_json() const {
+	return jbuild()
+		.set("startLine", start_line())
+		.opt("startCharacter", start_character())
+		.set("endLine", end_line())
+		.opt("endCharacter", end_character())
+		.opt("kind", kind() | folding_range_kind_to_json)
+		.get();
 }
 
 } /* namespace lsp */

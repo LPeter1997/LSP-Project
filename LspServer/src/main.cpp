@@ -39,6 +39,7 @@ struct my_server : public lsp::langserver {
 			.capabilities(lsp::server_capabilities()
 				.text_document_sync(lsp::text_document_sync_kind::full)
 				.document_highlight_provider(true)
+				.folding_range_provider(true)
 			);
 	}
 
@@ -79,6 +80,19 @@ struct my_server : public lsp::langserver {
 		return {
 			lsp::document_highlight().highlight_range(yk_to_lsp(tok.range_()))
 		};
+	}
+
+	std::vector<lsp::folding_range> on_folding_range(lsp::folding_range_params const& p) override {
+		std::cerr << "Fold request!" << std::endl;
+		std::vector<lsp::folding_range> result;
+		for (auto const& t : m_Tokens) {
+			if (t.type() == yk::token::NestedComment) {
+				result.push_back(lsp::folding_range()
+					.fold_range(yk_to_lsp(t.range_()))
+				);
+			}
+		}
+		return result;
 	}
 
 private:
