@@ -20,6 +20,20 @@ void platform_init() { }
 
 namespace lsp {
 
+void langserver::send_notification(char const* method, json&& p) {
+	m_Connection->write(rpc::notification(method, std::move(p)));
+}
+
+void langserver::publish_diagnostics(std::string const& uri, std::vector<diagnostic> const& diags) {
+	send_notification(
+		"textDocument/publishDiagnostics",
+		publish_diagnostics_params()
+			.uri(uri)
+			.diagnostics(diags)
+			.to_json()
+	);
+}
+
 void connection::global_init() {
 	platform_init();
 }
@@ -1119,6 +1133,46 @@ json folding_range::to_json() const {
 		.set("endLine", end_line())
 		.opt("endCharacter", end_character())
 		.opt("kind", kind() | folding_range_kind_to_json)
+		.get();
+}
+
+// Diagnostic
+
+json diagnostic::to_json() const {
+	return jbuild()
+		.set("range", diagnostic_range().to_json())
+		.opt("severity", severity() | lift(any_to_json))
+		.opt("code", code() | lift(any_to_json))
+		.opt("source", source())
+		.set("message", message())
+		.set("relatedInformation", vector_to_json(related_information()))
+		.get();
+}
+
+// DiagnosticRelatedInformation
+
+json diagnostic_related_information::to_json() const {
+	return jbuild()
+		.set("location", info_location().to_json())
+		.set("message", message())
+		.get();
+}
+
+// Location
+
+json location::to_json() const {
+	return jbuild()
+		.set("uri", uri())
+		.set("range", location_range().to_json())
+		.get();
+}
+
+// PublishDiagnosticsParams
+
+json publish_diagnostics_params::to_json() const {
+	return jbuild()
+		.set("uri", uri())
+		.set("diagnostics", vector_to_json(diagnostics()))
 		.get();
 }
 

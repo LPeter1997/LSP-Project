@@ -15,6 +15,8 @@
 
 namespace lsp {
 
+struct connection;
+
 struct initialize_params;
 struct initialize_result;
 struct did_open_text_document_params;
@@ -24,6 +26,8 @@ struct text_document_position_params;
 struct did_save_text_document_params;
 struct folding_range_params;
 struct folding_range;
+struct publish_diagnostics_params;
+struct diagnostic;
 
 /**
  * The interface that the language server object has to implement.
@@ -36,6 +40,15 @@ struct langserver {
 	virtual void on_text_document_saved(did_save_text_document_params const&) = 0;
 	virtual std::vector<document_highlight> on_text_document_highlight(text_document_position_params const&) = 0;
 	virtual std::vector<folding_range> on_folding_range(folding_range_params const&) = 0;
+
+	void publish_diagnostics(std::string const& uri, std::vector<diagnostic> const& diags);
+
+private:
+	void send_notification(char const* method, json&& p);
+
+	friend struct langserver_handler;
+
+	connection* m_Connection;
 };
 
 /**
@@ -78,6 +91,7 @@ struct langserver_handler {
 	explicit langserver_handler(std::istream& in, std::ostream& out,
 		langserver& ls)
 		: m_Connection(in, out), m_Langserver(&ls) {
+		m_Langserver->m_Connection = &m_Connection;
 	}
 
 	auto& in() { return m_Connection.in(); }
@@ -227,6 +241,16 @@ enum class folding_range_kind {
 	comment,
 	imports,
 	region,
+};
+
+/**
+ * DiagnosticSeverity.
+ */
+enum class diagnostic_severity {
+	error = 1,
+	warning = 2,
+	information = 3,
+	hint = 4,
 };
 
 /**
@@ -1113,6 +1137,60 @@ struct folding_range {
 	named_mem(i32, end_line);
 	named_mem(std::optional<i32>, end_character) = std::nullopt;
 	named_mem(std::optional<folding_range_kind>, kind) = std::nullopt;
+};
+
+/**
+ * Location.
+ */
+struct location {
+	ctors(location);
+
+	json to_json() const;
+
+	named_mem(std::string, uri);
+	named_mem(range, location_range);
+};
+
+/**
+ * DiagnosticRelatedInformation.
+ */
+struct diagnostic_related_information {
+	ctors(diagnostic_related_information);
+
+	json to_json() const;
+
+	named_mem(location, info_location);
+	named_mem(std::string, message);
+};
+
+/**
+ * Diagnostic.
+ */
+struct diagnostic {
+	using code_t = std::variant<i32, std::string>;
+
+	ctors(diagnostic);
+
+	json to_json() const;
+
+	named_mem(range, diagnostic_range);
+	named_mem(std::optional<diagnostic_severity>, severity) = std::nullopt;
+	named_mem(std::optional<code_t>, code) = std::nullopt;
+	named_mem(std::optional<std::string>, source) = std::nullopt;
+	named_mem(std::string, message);
+	named_mem(std::vector<diagnostic_related_information>, related_information);
+};
+
+/**
+ * PublishDiagnosticsParams.
+ */
+struct publish_diagnostics_params {
+	ctors(publish_diagnostics_params);
+
+	json to_json() const;
+
+	named_mem(std::string, uri);
+	named_mem(std::vector<diagnostic>, diagnostics);
 };
 
 #undef named_mem
