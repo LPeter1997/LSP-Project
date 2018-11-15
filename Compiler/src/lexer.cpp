@@ -1,5 +1,6 @@
 #include <cctype>
 #include <cstring>
+#include "error.hpp"
 #include "lexer.hpp"
 
 namespace yk {
@@ -219,7 +220,11 @@ token lexer::next() {
 				u32 depth = 1;
 				while (depth > 0) {
 					if (is_eof()) {
-						// XXX(LPeter1997): Error here
+						// XXX(LPeter1997): Better positioning? (end of last
+						// visible)
+						err::report(err::unclosed_comment(
+							m_Position, depth
+						));
 						break;
 					}
 					else if (parse_newline()) {

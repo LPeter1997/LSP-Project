@@ -6,11 +6,12 @@
  * @description Common type definitions, aliases and functionalities.
  */
 
-#ifndef COMMON_HPP
-#define COMMON_HPP
+#ifndef YK_COMMON_HPP
+#define YK_COMMON_HPP
 
 #include <cassert>
 #include <cstdint>
+#include <variant>
 
 #define yk_assert(x) assert(x)
 #define yk_panic(str) assert(false && str)
@@ -29,6 +30,31 @@ using u16 = std::uint16_t;
 using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 
+// A simple mechanism to make variant visitation a bit easier with lambdas.
+
+template <typename... Ts>
+struct overload_set : Ts... {
+    using Ts::operator()...;
+
+    template <typename... Ps>
+    constexpr overload_set(Ps&&... params)
+        : Ts(std::forward<Ps>(params))... {
+    }
+};
+
+template <typename... Ts>
+constexpr auto overload(Ts&&... fns) {
+    return overload_set<std::decay_t<Ts>...>(std::forward<Ts>(fns)...);
+}
+
+template <typename... Vs>
+constexpr auto match(Vs&&... vs) {
+    return [&vs...](auto&&... fs) -> decltype(auto) {
+        auto visitor = overload(std::forward<decltype(fs)>(fs)...);
+        return std::visit(visitor, std::forward<Vs>(vs)...);
+    };
+}
+
 } /* namespace yk */
 
-#endif /* COMMON_HPP */
+#endif /* YK_COMMON_HPP */

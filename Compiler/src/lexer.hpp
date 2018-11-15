@@ -6,8 +6,8 @@
  * @description The whole lexical analysis and the needed structures.
  */
 
-#ifndef LEXER_HPP
-#define LEXER_HPP
+#ifndef YK_LEXER_HPP
+#define YK_LEXER_HPP
 
 #include <algorithm>
 #include <string>
@@ -283,4 +283,4 @@ private:
 
 } /* namespace yk */
 
-#endif /* LEXER_HPP */
+#endif /* YK_LEXER_HPP */
