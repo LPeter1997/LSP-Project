@@ -1,5 +1,6 @@
 #include <iostream>
 #include "common.hpp"
+#include "error.hpp"
 #include "lsp.hpp"
 #include "lexer.hpp"
 
@@ -26,6 +27,21 @@ static yk::range lsp_to_yk(lsp::range const& r) {
 }
 
 struct my_server : public lsp::langserver {
+	my_server() {
+		yk::err::init();
+	}
+
+	lsp::diagnostic error_to_diagnostic(yk::err::error_t const& err) {
+		return yk::match(err)(
+			[](yk::err::unclosed_comment const& e) {
+				return lsp::diagnostic()
+					.message(std::string("Unclosed comment with nesting " + std::to_string(e.depth())))
+					.severity(lsp::diagnostic_severity::error)
+					.diagnostic_range(yk_to_lsp(e.err_range()));
+			}
+		);
+	}
+
 	lsp::initialize_result initialize(lsp::initialize_params const& p) override {
 		if (p.process_id()) {
 			std::cerr << "Process id: " << *p.process_id() << std::endl;
@@ -44,7 +60,10 @@ struct my_server : public lsp::langserver {
 	}
 
 	void on_text_document_opened(lsp::did_open_text_document_params const& p) override {
+		m_URI = p.text_document().uri();
+		yk::err::clear();
 		m_Tokens = yk::lexer::all(p.text_document().text().c_str());
+		make_diagnostics();
 		std::cerr << "Tokens: " << std::endl;
 		for (auto const& t : m_Tokens) {
 			std::cerr << "  [" << t.start().row() << " :: " << t.start().column() << " - " << t.end().column() << "] - '" << t.value() << "'" << std::endl;
@@ -56,7 +75,9 @@ struct my_server : public lsp::langserver {
 		auto const& change = p.content_changes().front();
 		lsp_assert(change.full_content());
 		std::string const& src = change.text();
+		yk::err::clear();
 		m_Tokens = yk::lexer::all(src.c_str());
+		make_diagnostics();
 		std::cerr << "Tokens: " << std::endl;
 		for (auto const& t : m_Tokens) {
 			std::cerr << "  [" << t.start().row() << " :: " << t.start().column() << " - " << t.end().column() << "] - '" << t.value() << "'" << std::endl;
@@ -95,8 +116,19 @@ struct my_server : public lsp::langserver {
 		return result;
 	}
 
+	void make_diagnostics() {
+		auto const& errs = yk::err::errors();
+		std::vector<lsp::diagnostic> diags;
+		for (auto const& err : errs) {
+			diags.push_back(error_to_diagnostic(err));
+		}
+		std::cerr << "Publishing " << errs.size() << " diagnostic messages" << std::endl;
+		publish_diagnostics(m_URI, diags);
+	}
+
 private:
 	std::vector<yk::token> m_Tokens;
+	std::string m_URI;
 };
 
 int main() {

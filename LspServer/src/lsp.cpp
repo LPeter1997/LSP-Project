@@ -330,7 +330,7 @@ json tuple_to_json(T&& t) {
 
 template <typename V>
 json vector_to_json(V&& vec) {
-	json res;
+	json res = json::array();
 	for (auto&& elem : std::forward<V>(vec)) {
 		res.push_back(any_to_json(std::forward<decltype(elem)>(elem)));
 	}

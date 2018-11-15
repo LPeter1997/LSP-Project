@@ -10,6 +10,7 @@ hello {
 )";
 
 int main() {
+	yk::err::init();
 	auto toks = yk::lexer::all(test_src);
 	auto const& errs = yk::err::errors();
 	for (auto const& err : errs) {

@@ -37,6 +37,8 @@ struct unclosed_comment {
 	position const& pos() const { return m_Position; }
 	u32 depth() const { return m_Depth; }
 
+	range err_range() const { return range(pos(), 1); }
+
 private:
 	position m_Position;
 	u32 m_Depth;
@@ -50,6 +52,11 @@ using error_t = std::variant<
  * Initializes the error interface for usage.
  */
 void init();
+
+/**
+ * Clears the error list.
+ */
+void clear();
 
 /**
  * Reports an error.

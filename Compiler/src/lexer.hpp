@@ -90,6 +90,15 @@ struct range {
 		: m_From(from), m_To(to) {
 	}
 
+	/**
+	 * Creates a range from a position and length.
+	 * @param from The starting position of the range. (inclusive)
+	 * @param n The length of the range (horizontal).
+	 */
+	range(position const& from, u32 n)
+		: m_From(from), m_To(position::row_col(from.row(), from.column() + n)) {
+	}
+
 	position const& start() const { return m_From; }
 	position const& end() const { return m_To; }
 
