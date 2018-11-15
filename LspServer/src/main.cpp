@@ -38,6 +38,13 @@ struct my_server : public lsp::langserver {
 					.message(std::string("Unclosed comment with nesting " + std::to_string(e.depth())))
 					.severity(lsp::diagnostic_severity::error)
 					.diagnostic_range(yk_to_lsp(e.err_range()));
+			},
+
+			[](yk::err::unexpected_char const& e) {
+				return lsp::diagnostic()
+					.message(std::string("Unexpected character '") + e.character() + std::string("' (code: ") + std::to_string(e.character_code()) + ")")
+					.severity(lsp::diagnostic_severity::error)
+					.diagnostic_range(yk_to_lsp(e.err_range()));
 			}
 		);
 	}

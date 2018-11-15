@@ -290,7 +290,7 @@ token lexer::next() {
 		// Unknown
 		if (std::isgraph(m_Source[0])) {
 			// Only error if a visible character
-			// XXX(LPeter1997): Unknown token error
+			err::report(err::unexpected_char(m_Position, m_Source[0]));
 			advance();
 		}
 		else {
