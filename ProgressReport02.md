@@ -59,9 +59,11 @@ Bár a lexikális analízis sok információt nem ad, néhány fícsört máris 
 Ha kattintunk, szeretnénk a teljes terminálist kiemelve látni. Így például egy komment is teljes egészében ki lesz emelve, ahelyett hogy egyetlen szót emelnénk ki belőle. Miután jeleztük a képességet a kliens felé, annyi a dolgunk, hogy válaszolunk a [document highlight request](https://microsoft.github.io/language-server-protocol/specification#textDocument_documentHighlight)-ekre. A request tartalmazza, hogy éppen hol áll a kurzor, így bejön egy újabb szokatlan fícsör: visszakeresni egy tokent pozíció alapján.
 
 Az implementáció előtt:
+
 ![Egysoros komment szavanként kiemelve](./Highlight_Before01.PNG)
 ![Többsoros komment szavanként kiemelve](./Highlight_Before02.PNG)
 
 Implementáció után:
+
 ![Egysoros komment teljesen kiemelve](./Highlight_After01.PNG)
 ![Többsoros komment teljesen kiemelve](./Highlight_After02.PNG)
