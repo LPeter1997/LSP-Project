@@ -1,7 +1,7 @@
 
 # Haladási napló: Második bejegyzés
 ## Célmódosítás
-Előzőleg sikeresen félrenéztem az LSP képességeit, és azt hittem lehetséges már a syntax highlight tisztán a protokollból. Mint kiderült, ez még mindössze egy [proposal](https://github.com/Microsoft/language-server-protocol/pull/124). Így ehelyett első feladatomnak brace párok kiemelését tűztem ki, ezután pedig egy komolyabb fícsört (változhat, de szeretnék syntax error report-ot és go to definition-t). Hogy min múlik mi lesz az, később kifejtem.
+Előzőleg sikeresen félrenéztem az LSP képességeit, és azt hittem lehetséges már a syntax highlight tisztán a protokollból. Mint kiderült, ez még mindössze egy [proposal](https://github.com/Microsoft/language-server-protocol/pull/124). Így ehelyett első feladatomnak egy - másik - ergonomikus dolgot, a comment folding-ot tűztem ki, miközben ún. _token_ kiemelást is implementálok.
 
 ## Compiler design 101
 Mielőtt interakciókat tudnánk leírni a kliens és szerver között, meg kell nézzük hogy hogyan épül fel a szerver legfontosabb eleme, a fordító.
@@ -9,7 +9,7 @@ Mielőtt interakciókat tudnánk leírni a kliens és szerver között, meg kell
 ### A klasszikus fordítási modell
 Néhány extrémet leszámítva a mai fordítók nagyjából ugyanazt a fordítási modellt követik:
 ![A fordítás folyamata](./CompilationProcess.svg)
-**Note:** _Sokszor nem különböztetnek meg Parse Tree-t és AST-t, mert egy és ugyanazon struktúrát használják az implementációnál. Elviekben a különbség annyi, hogy az AST nem tartalmaz fölösleges szintaktikai elemeket és szemantikai információt hordoz, például referenciákat szimbólumokhoz._
+**Note:** _Sokszor nem különböztetnek meg Parse Tree-t és AST-t, mert egy és ugyanazon struktúrát használják az implementációnál. Elviekben a különbség annyi, hogy az AST nem tartalmaz fölösleges szintaktikai elemeket, illetve szemantikai információt hordoz, például referenciákat szimbólumokhoz._
 
 Manapság divat a backend részleget egy létező megoldásra, leggyakoribb esetben például az [LLVM](https://llvm.org/)-re hagyni.
 
@@ -17,23 +17,33 @@ Ideális esetben a fenti pipeline folyamatok teljesen elkülönülnek, nem hatna
 
 A C++ például odáig fokozza a visszahatást korábbi folyamatokra, hogy a [fordítási folyamat leállása](http://blog.reverberate.org/2013/08/parsing-c-is-literally-undecidable.html) ekvivalens a [leállási problémával](https://en.wikipedia.org/wiki/Halting_problem). Természetesen ez csak egy elvi limitáció, a gyakorlatban korlátok vannak bevezetve, mint például template példányosítási mélységhatár.
 
-A mi esetünkben - a metaprogramozási képességeket leszámítva - a folyamatokat teljesen el tudjuk különíteni.
+A mi esetünkben - a metaprogramozási képességeket leszámítva, mely erősen túlmutat a jelenlegi célok keretein - a folyamatokat teljesen el tudjuk különíteni.
 
 ### Probléma a klasszikus modellel
 A legtöbb nyelvi segédeszköznek - mint ami az editorokban is van - a fordító front-endjét kell használniuk, a felhasználói hibák a legtöbb esetben itt történnek. Azonban ha minden egyes karakter változására lefutna a teljes folyamat, az nagyon lassú és pazarló volna. Szükséges, hogy a front-end képes legyen csak a változásokra reflektálni.
 
-Az egyszerűség kedvéért ezt a részét mellőzöm a projektnek, de megemlítek módszert mely alkalmazható.
+_Az egyszerűség kedvéért ezt a részét mellőzöm a projektnek, de megemlítek módszert mely alkalmazható._
 
-A klasszikus fordítókat feketedobozként írták. Ez jó volt akkor, amikor ténylegesen csak parancssori alkalmazásokként használták őket, azonban - mint előbb láthattuk - megszületett az igény, hogy a front-end aktív kommunikációt végezzen egy protokollon keresztük.
+A másik probléma, hogy a klasszikus fordítókat feketedobozként írták. Ez jó volt akkor, amikor ténylegesen csak parancssori alkalmazásokként használták őket, azonban - mint előbb láthattuk - megszületett az igény, hogy a front-end aktív kommunikációt végezzen egy protokollon keresztül. Szükséges tehát, hogy a fordítónak legyen egy API formája, melyen keresztül elérhetünk szintaktikai, referenciális illetve diagnosztikai információt (és még sok mást).
 
-## Lexikális analízis, brace matching
-A brace matching-hez első lépésben elegendő egy lexikai analízist végrehajtani, és párba állítani a megfelelő brace szimbólumokat. Itt még szintaktikai elemzésre sincs szükség.
+## Projekt architektúra
+Mielőtt elkezdünk foglalkozni a fordítás első lépésével, érdemes a projekt architektúráját közelebb vigyük valami célnak megfelelőbb formába.
 
-** Note:** _Ez csak akkor tehető meg, ahol a nyelv elvárja a brace-k egyensúlyát. A legtöbb nyelv szerencsére ilyen, ennek ellenére ezt a fícsört is érdemes lehet átmozgatni a Parse Tree elkészítése utánra. Most a prezentáció erejéig jó lesz a lexikai elemzés után is._
+Jelenleg a projekt 2 modulból áll: egy nyelvi szerverből - mely főként egy LSP framework - illetve egy nyelvi kliensből VS Code-hoz. Ez azt jelenti, hogy a nyelvi szervert összekötöttük az LSP framework-kel, ami prototípusok készítésére kényelmes lehet, de nem segíti az újrafelhasználhatóságot.
 
-A lexikai elemzést az ún. _Lexer_ végzi. Elméletben ezt egy egyszerű állapotgép is el tudja végezni, és célja egyszerűsíteni a szintaktikai elemzést. Ignorálja a szöveg azon részeit, melyek nem fontosak a nyelvtannak (szünet, új sor, komment, stb) és normalizálja azokat a lexémákat, melyeknek akár végtelen karakteres reprezentációja lehet - mint például a számok vagy változónevek.
+### Az új architektúra:
+- **LSP framework**: A nyers LSP kommunikációt és üzeneteket rejti ela tényleges nyelvi szerver elől. Biztosít egy absztrakt interfészt, melyet a nyelvi szervernek implementálnia kell, ezen keresztük magas szinten használhatja a protokollt. Ez a modul csak akkor változik, ha a protokollban új üzenetet akarunk lekezelni, mert például új specifikáció jelent meg.
+- **Compiler (framework)**: A nyelv lényegi implementációja. Implementálja a fordítási fázisokat és ehhez programozói felületet biztosít. Csak akkor változik, ha a nyelven vagy valamelyik fázisán változtatni akarunk.
+- **Language Server**: A nyelv folyamatos fordításával és az abból lekért információkból üzeneteket alkot, melyeket a nyelvi kliensnek küld. Figyeli a nyelvi kliens üzeneteit, azokra reagál. Akkor változik, ha változtatni akarunk a nyelvi segéden, vagy újabb fícsörrel akarjuk könnyíteni az adott nyelvben való kódolást.
+- **Language Client(s)**: Egyszerű, pár soros plug-inok az editorokhoz. Feladatuk elindítani a nyelvi szervert és beállítani a kommunikáció módját. Ebben a projektben jelenleg csak VS Code-hoz van ilyen. Ha egyszer megírtuk, általában nem változik.
 
-A lexikális analízis végcélja egy _token_ sorozat előállítása. Egy token lényegében egy lényeges, egységnyi része a nyelv nyelvtanának. Ilyen egy brace, egy név, egy zárójel, stb. A lexer implementációja:
+### Az új architektúra függőségi gráfja:
+![A projekt függőségei](./ProjectDependency.svg)
+
+## A fordítás első fázisa: Lexikális analízis
+A lexikai elemzést az ún. _Lexer_ végzi. Elméletben ezt egy egyszerű állapotgép is el tudja végezni, és célja egyszerűsíteni a szintaktikai elemzést. Klasszikus esetben ignorálja a szöveg azon részeit, melyek nem fontosak a nyelvtannak (szünet, új sor, komment, stb) és normalizálja azokat a lexémákat, melyeknek akár végtelen karakteres reprezentációja lehet - mint például a számok vagy változónevek.
+
+A lexikális analízis végcélja egy _token_ sorozat előállítása. Egy token lényegében egy egységnyi része a nyelv nyelvtanának, pontosabban definiálva a token nem más, mint a nyelvtan [terminálisainak](https://en.wikipedia.org/wiki/Terminal_and_nonterminal_symbols) összessége. Ilyen egy brace, egy név, egy zárójel, stb. A lexer implementációja az alábbi file-okban található:
 - lexer.hpp
 - lexer.cpp
 
