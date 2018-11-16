@@ -33,17 +33,35 @@ Jelenleg a projekt 2 modulból áll: egy nyelvi szerverből - mely főként egy 
 
 ### Az új architektúra:
 - **LSP framework**: A nyers LSP kommunikációt és üzeneteket rejti ela tényleges nyelvi szerver elől. Biztosít egy absztrakt interfészt, melyet a nyelvi szervernek implementálnia kell, ezen keresztük magas szinten használhatja a protokollt. Ez a modul csak akkor változik, ha a protokollban új üzenetet akarunk lekezelni, mert például új specifikáció jelent meg.
-- **Compiler (framework)**: A nyelv lényegi implementációja. Implementálja a fordítási fázisokat és ehhez programozói felületet biztosít. Csak akkor változik, ha a nyelven vagy valamelyik fázisán változtatni akarunk.
+- **Compiler (framework)**: A nyelv lényegi implementációja. Implementálja a fordítási fázisokat és ehhez programozói felületet biztosít. Csak akkor változik, ha a nyelven vagy valamelyik fázisán változtatni akarunk. Nekünk most csak a front-end része kell, ez hasznos a nyelvi szerver szempontjából.
 - **Language Server**: A nyelv folyamatos fordításával és az abból lekért információkból üzeneteket alkot, melyeket a nyelvi kliensnek küld. Figyeli a nyelvi kliens üzeneteit, azokra reagál. Akkor változik, ha változtatni akarunk a nyelvi segéden, vagy újabb fícsörrel akarjuk könnyíteni az adott nyelvben való kódolást.
 - **Language Client(s)**: Egyszerű, pár soros plug-inok az editorokhoz. Feladatuk elindítani a nyelvi szervert és beállítani a kommunikáció módját. Ebben a projektben jelenleg csak VS Code-hoz van ilyen. Ha egyszer megírtuk, általában nem változik.
 
 ### Az új architektúra függőségi gráfja:
 ![A projekt függőségei](./ProjectDependency.svg)
+Ez egy előnyös felépítés, a compiler, editor API és a protokoll (így a framework is) viszonylag ritkán változik, így a függőségek stabil irányba mutatnak. Bár a nyelvi kliens függ a szervertől, általában a változás nem érinti a klienst.
 
 ## A fordítás első fázisa: Lexikális analízis
-A lexikai elemzést az ún. _Lexer_ végzi. Elméletben ezt egy egyszerű állapotgép is el tudja végezni, és célja egyszerűsíteni a szintaktikai elemzést. Klasszikus esetben ignorálja a szöveg azon részeit, melyek nem fontosak a nyelvtannak (szünet, új sor, komment, stb) és normalizálja azokat a lexémákat, melyeknek akár végtelen karakteres reprezentációja lehet - mint például a számok vagy változónevek.
+A lexikai elemzést az ún. _Lexer_ végzi. Elméletben ezt egy egyszerű [állapotgép](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) is el tudja végezni, és célja egyszerűsíteni a szintaktikai elemzést. Klasszikus esetben ignorálja a szöveg azon részeit, melyek nem fontosak a nyelvtannak (szünet, új sor, komment, stb) és normalizálja azokat a lexémákat, melyeknek akár végtelen karakteres reprezentációja lehet - mint például a számok vagy változónevek.
 
 A lexikális analízis végcélja egy _token_ sorozat előállítása. Egy token lényegében egy egységnyi része a nyelv nyelvtanának, pontosabban definiálva a token nem más, mint a nyelvtan [terminálisainak](https://en.wikipedia.org/wiki/Terminal_and_nonterminal_symbols) összessége. Ilyen egy brace, egy név, egy zárójel, stb. A lexer implementációja az alábbi file-okban található:
-- lexer.hpp
-- lexer.cpp
+- lexer.hpp TODO: Link
+- lexer.cpp TODO: Link
 
+A klasszikus esettől két ponton térünk el ebben a lépésben:
+- Az analízisnél eltároljuk a kommenteket is mint tokenek, bár szintaktikai elemzésnél ignorálni fogjuk. Erre azért van szükség, hogy a kommentekre is tudjunk műveleteket definiálni az editorban (pl. összecsukás).
+- A nyelv megenged rekurzív kommenteket. Emiatt ennek a tokennek a nyelve ekvivalens az a<sup>n</sup>b<sup>m</sup>c<sup>n</sup> nyelvvel, ami már nem ismerhető fel állapotgéppel. Helyette, ebben a lépésben egy nagyon leegyszerűsített [DPDA](https://en.wikipedia.org/wiki/Deterministic_pushdown_automaton)-t használunk - a stack helyett gyakorlatilag csak egy mélységszámláló van.
+
+## Fícsörök az első fázisból
+Bár a lexikális analízis sok információt nem ad, néhány fícsört máris implementálhatunk a nyelvi szerverbe.
+
+### Kattintásra a teljes token kiemelése
+Ha kattintunk, szeretnénk a teljes terminálist kiemelve látni. Így például egy komment is teljes egészében ki lesz emelve, ahelyett hogy egyetlen szót emelnénk ki belőle. Miután jeleztük a képességet a kliens felé, annyi a dolgunk, hogy válaszolunk a [document highlight request](https://microsoft.github.io/language-server-protocol/specification#textDocument_documentHighlight)-ekre. A request tartalmazza, hogy éppen hol áll a kurzor, így bejön egy újabb szokatlan fícsör: visszakeresni egy tokent pozíció alapján.
+
+Az implementáció előtt:
+![Egysoros komment szavanként kiemelve](./Highlight_Before01.png)
+![Többsoros komment szavanként kiemelve](./Highlight_Before02.png)
+
+Implementáció után:
+![Egysoros komment teljesen kiemelve](./Highlight_After01.png)
+![Többsoros komment teljesen kiemelve](./Highlight_After02.png)
