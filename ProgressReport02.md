@@ -39,6 +39,7 @@ Jelenleg a projekt 2 modulból áll: egy nyelvi szerverből - mely főként egy 
 
 ### Az új architektúra függőségi gráfja:
 ![A projekt függőségei](./ProjectDependency.svg)
+
 Ez egy előnyös felépítés, a compiler, editor API és a protokoll (így a framework is) viszonylag ritkán változik, így a függőségek stabil irányba mutatnak. Bár a nyelvi kliens függ a szervertől, általában a változás nem érinti a klienst.
 
 ## A fordítás első fázisa: Lexikális analízis
