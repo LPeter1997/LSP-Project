@@ -57,7 +57,7 @@ A klasszikus esettől két ponton térünk el ebben a lépésben:
 Bár a lexikális analízis sok információt nem ad, néhány fícsört máris implementálhatunk a nyelvi szerverbe.
 
 ### Kattintásra a teljes token kiemelése
-Ha kattintunk, szeretnénk a teljes terminálist kiemelve látni. Így például egy komment is teljes egészében ki lesz emelve, ahelyett hogy egyetlen szót emelnénk ki belőle. Miután jeleztük a képességet a kliens felé, annyi a dolgunk, hogy válaszolunk a [document highlight request](https://microsoft.github.io/language-server-protocol/specification#textDocument_documentHighlight)-ekre. A request tartalmazza, hogy éppen hol áll a kurzor, így bejön egy újabb szokatlan fícsör: visszakeresni egy tokent pozíció alapján.
+Ha kattintunk, szeretnénk a teljes terminálist kiemelve látni. Így például egy komment is teljes egészében ki lesz emelve ahelyett, hogy egyetlen szót emelnénk ki belőle. Miután jeleztük a képességet a kliens felé, annyi a dolgunk, hogy válaszolunk a [document highlight request](https://microsoft.github.io/language-server-protocol/specification#textDocument_documentHighlight)-ekre. A válasznak az összes kiemelés intervallumát (sor és oszloppal leírva) tartalmaznia kell. A request tartalmazza, hogy éppen hol áll a kurzor, így bejön egy újabb szokatlan fícsör: visszakeresni egy tokent pozíció alapján.
 
 Az implementáció előtt:
 
@@ -68,3 +68,32 @@ Implementáció után:
 
 ![Egysoros komment teljesen kiemelve](./Highlight_After01.PNG)
 ![Többsoros komment teljesen kiemelve](./Highlight_After02.PNG)
+
+### Többsoros kommentek összecsukása
+Mivel a nyelvben rekurzív kommentek vannak, a VS Code-ba (és a legtöbb editorba) beépített összecsukási mechanizmus egyszerűen félrevezető. Összecsukás előtt:
+
+![Nem összecsukott komment](./Comment_Unfolded.PNG)
+
+Összecsukás után:
+
+![Rosszul összecsukott komment](./Comment_Bad_Fold.PNG)
+
+A protokollban mindössze jeleznünk kell a képességet, ezután minden kódbéli változásnál kapunk egy [folding range request](https://microsoft.github.io/language-server-protocol/specification#textDocument_foldingRange)-et. Válaszul az összes összecsukható elem intervallumát meg kell adjuk. Jelen esetben elég, ha az összes többsoros komment token intervallumát adjuk válaszul. Az eredmény:
+
+![Jól összecsukott komment](Comment_Good_Fold.PNG)
+
+### Hiba: Nem várt karakter
+Minden hiba, warning és hint visszajelzése diagnostic leírásokkal történik. A szerver egy [publish diagnostics](https://microsoft.github.io/language-server-protocol/specification#textDocument_publishDiagnostics) üzenetben le kell írja az összes diagnosztikai információt, melyet az adott file-hoz kíván csatolni. A kliens nem képes diagnosztika halmozására, mindig az összes megjelenítendő információt kell elküldeni.
+
+Az előző két fícsörnél talán hasznosabb, ha hiba visszajelzéseket adunk. Egy nagyon egyszerű - még parser-t nem igénylő - szintaktikai hiba például ha olyan karakter kerül a forrásba, mely ott nem szerepelhet a lexikai szabályok szerint.
+
+![Nem várt karakter hiba](./Unexpected_Char.png)
+
+### Hiba: Lezáratlan komment
+Mivel a nyelv támogat egymásba ágyazható - rekurzív - kommenteket, érdemes jelezni, ha egy komment nem lett lezárva a file vége előtt, és ha ez történt, milyen mélységben jár a komment.
+
+![Lezáratlan komment hiba](./Unclosed_Comment_1.png)
+![Lezáratlan komment hiba](./Unclosed_Comment_2.png)
+
+## Hova tovább?
+A lexikai rész alapjai ezzel kimerültek visszajelzés szempontjából. A következő fordítási fázisban - elemzés/parsing -  visszajelezhetünk olyan hibákat, melyeket kezdő vagy gyakorlatlan programozók sokat követnek el. Ilyenek a lehagyott pontosvessző, bezáratlan zárójelpár, stb. Mindenek előtt dizájnolnunk kell egy AST-t, és meg kell válasszuk az elemző metódusunkat.
