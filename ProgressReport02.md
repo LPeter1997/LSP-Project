@@ -46,8 +46,8 @@ Ez egy előnyös felépítés, a compiler, editor API és a protokoll (így a fr
 A lexikai elemzést az ún. _Lexer_ végzi. Elméletben ezt egy egyszerű [állapotgép](https://en.wikipedia.org/wiki/Deterministic_finite_automaton) is el tudja végezni, és célja egyszerűsíteni a szintaktikai elemzést. Klasszikus esetben ignorálja a szöveg azon részeit, melyek nem fontosak a nyelvtannak (szünet, új sor, komment, stb) és normalizálja azokat a lexémákat, melyeknek akár végtelen karakteres reprezentációja lehet - mint például a számok vagy változónevek.
 
 A lexikális analízis végcélja egy _token_ sorozat előállítása. Egy token lényegében egy egységnyi része a nyelv nyelvtanának, pontosabban definiálva a token nem más, mint a nyelvtan [terminálisainak](https://en.wikipedia.org/wiki/Terminal_and_nonterminal_symbols) összessége. Ilyen egy brace, egy név, egy zárójel, stb. A lexer implementációja az alábbi file-okban található:
-- lexer.hpp TODO: Link
-- lexer.cpp TODO: Link
+- [lexer.hpp](./Compiler/src/lexer.hpp)
+- [lexer.cpp](./Compiler/src/lexer.cpp)
 
 A klasszikus esettől két ponton térünk el ebben a lépésben:
 - Az analízisnél eltároljuk a kommenteket is mint tokenek, bár szintaktikai elemzésnél ignorálni fogjuk. Erre azért van szükség, hogy a kommentekre is tudjunk műveleteket definiálni az editorban (pl. összecsukás).

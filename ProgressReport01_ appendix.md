@@ -37,6 +37,8 @@ type check_addition(type const& left, type const& right) {
 }
 ```
 
+**Note**: _ADT-ket már C-ben is használtunk - union és egy enum tag -, de nem kaptunk típus biztonságot és automatikus vizitálást._
+
 ## Overload set-ek
 Függvény overload halmazt átadni szabad (free) függvényekből nehézkes, pedig gyakran szükség lehet rá. Funktorba/objektumba emeléshez standard módszer még nincs ([proposal](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0834r0.html)). Hasonló a helyzet, ha egy template függvényt szeretnénk átadni, ugyanis specifikálni kell a típust még akkor is, ha ez a type inference miatt redundáns. Ehhez definiáltam egy `lift` makrót, mely az összes overload-ot egy funktor - a gyakorlatban lambda - alá gyűjti. Használatra példa:
 ```c++
