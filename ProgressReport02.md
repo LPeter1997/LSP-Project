@@ -1,7 +1,7 @@
 
 # Haladási napló: Második bejegyzés
 ## Célmódosítás
-Előzőleg sikeresen félrenéztem az LSP képességeit, és azt hittem lehetséges már a syntax highlight tisztán a protokollból. Mint kiderült, ez még mindössze egy [proposal](https://github.com/Microsoft/language-server-protocol/pull/124). Így ehelyett első feladatomnak egy - másik - ergonomikus dolgot, a comment folding-ot tűztem ki, miközben ún. _token_ kiemelást is implementálok.
+Előzőleg sikeresen félrenéztem az LSP képességeit, és azt hittem lehetséges már a syntax highlight tisztán a protokollból. Mint kiderült, ez még mindössze egy [proposal](https://github.com/Microsoft/language-server-protocol/pull/124). Így ehelyett első feladatomnak egy - másik - ergonomikus dolgot, a comment folding-ot tűztem ki, miközben ún. _token_ kiemelést is implementálok.
 
 ## Compiler design 101
 Mielőtt interakciókat tudnánk leírni a kliens és szerver között, meg kell nézzük hogy hogyan épül fel a szerver legfontosabb eleme, a fordító.
