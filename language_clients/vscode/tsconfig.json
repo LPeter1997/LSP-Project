@@ -2,7 +2,7 @@
     "compilerOptions": {
         "module": "commonjs",
         "target": "es6",
-        "outDir": "./../../build/vscode_client",
+        "outDir": "./build",
         "lib": [
             "es6"
         ],

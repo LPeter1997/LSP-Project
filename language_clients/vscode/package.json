@@ -5,7 +5,7 @@
     "version": "0.0.1",
     "publisher": "LPeter1997",
     "engines": {
-        "vscode": "^1.27.0"
+        "vscode": "^1.29.0"
     },
     "categories": [
         "Other"
@@ -13,7 +13,7 @@
     "activationEvents": [
         "onLanguage:plaintext"
     ],
-    "main": "./../../build/vscode_client/extension",
+    "main": "./build/extension",
     "contributes": {
         "configuration": {
             "type": "object",
@@ -42,7 +42,7 @@
         "@types/mocha": "^2.2.42"
     },
     "dependencies": {
-        "vscode": "^1.1.6",
+        "vscode": "^1.1.18",
         "vscode-languageclient": "^4.1.4"
     }
 }

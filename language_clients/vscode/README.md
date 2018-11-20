@@ -1,6 +1,6 @@
-# LspClient README
+# yk-client README
 
-This is the README for your extension "LspClient". After writing up a brief description, we recommend including the following sections.
+This is the README for your extension "yk-client". After writing up a brief description, we recommend including the following sections.
 
 ## Features
 
