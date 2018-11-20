@@ -18,7 +18,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // The command to run the language server
     let command = context.asAbsolutePath(
-        path.join('out', 'langserver_test.exe')
+        path.join('language_server', 'yk_server.exe')
     );
 
     // Create the server runner options

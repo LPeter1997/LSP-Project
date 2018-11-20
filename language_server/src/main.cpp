@@ -1,8 +1,8 @@
 #include <iostream>
-#include "common.hpp"
-#include "error.hpp"
-#include "lsp.hpp"
-#include "lexer.hpp"
+#include <lsp/common.hpp>
+#include <lsp/lsp.hpp>
+#include <yk/error.hpp>
+#include <yk/lexer.hpp>
 
 static lsp::position yk_to_lsp(yk::position const& p) {
 	return lsp::position(p.row(), p.column());

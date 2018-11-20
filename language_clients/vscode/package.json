@@ -1,7 +1,7 @@
 {
-    "name": "lsp-client",
-    "displayName": "LspClient",
-    "description": "A test LSP client",
+    "name": "yk-client",
+    "displayName": "Yoakke Language Client",
+    "description": "A Yoakke Language Client for Visual Studio Code",
     "version": "0.0.1",
     "publisher": "LPeter1997",
     "engines": {
@@ -13,7 +13,7 @@
     "activationEvents": [
         "onLanguage:plaintext"
     ],
-    "main": "./out/extension",
+    "main": "./../../build/vscode_client/extension",
     "contributes": {
         "configuration": {
             "type": "object",
