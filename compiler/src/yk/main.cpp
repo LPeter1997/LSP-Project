@@ -2,6 +2,9 @@
 #include "error.hpp"
 #include "lexer.hpp"
 
+// XXX(LPeter1997): We could remove std::vector dependency everywhere by using
+// iterator pairs. That is more idiomatic C++.
+
 char const* test_src = R"(
 	/*
 hello {

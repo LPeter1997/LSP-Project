@@ -202,7 +202,7 @@ private:
  */
 struct lexer {
 	/**
-	 * A utility function that lexer a whole source string until the end and
+	 * A utility function that lexes a whole source string until the end and
 	 * returns the resulting tokens in a vector (including the EndOfFile token).
 	 * @return A vector of tokens.
 	 */

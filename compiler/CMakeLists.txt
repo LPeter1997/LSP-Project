@@ -1,9 +1,11 @@
 set(LIB_SOURCES
+	src/yk/ast.hpp
 	src/yk/common.hpp
 	src/yk/error.hpp
 	src/yk/error.cpp
 	src/yk/lexer.hpp
 	src/yk/lexer.cpp
+	src/yk/parser.hpp
 )
 
 set(CLI_SOURCES
