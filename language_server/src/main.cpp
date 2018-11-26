@@ -26,38 +26,29 @@ static yk::range lsp_to_yk(lsp::range const& r) {
 	);
 }
 
+static lsp::diagnostic error_to_diagnostic(yk::err::error_t const& err) {
+	return yk::match(err)(
+		[](yk::err::unclosed_comment const& e) {
+			return lsp::diagnostic()
+				.message(std::string("Unclosed comment with nesting " + std::to_string(e.depth())))
+				.severity(lsp::diagnostic_severity::error)
+				.diagnostic_range(yk_to_lsp(e.err_range()));
+		},
+		[](yk::err::unexpected_char const& e) {
+			return lsp::diagnostic()
+				.message(std::string("Unexpected character '") + e.character() + std::string("' (code: ") + std::to_string(e.character_code()) + ")")
+				.severity(lsp::diagnostic_severity::error)
+				.diagnostic_range(yk_to_lsp(e.err_range()));
+		}
+	);
+}
+
 struct my_server : public lsp::langserver {
 	my_server() {
 		yk::err::init();
 	}
 
-	lsp::diagnostic error_to_diagnostic(yk::err::error_t const& err) {
-		return yk::match(err)(
-			[](yk::err::unclosed_comment const& e) {
-				return lsp::diagnostic()
-					.message(std::string("Unclosed comment with nesting " + std::to_string(e.depth())))
-					.severity(lsp::diagnostic_severity::error)
-					.diagnostic_range(yk_to_lsp(e.err_range()));
-			},
-
-			[](yk::err::unexpected_char const& e) {
-				return lsp::diagnostic()
-					.message(std::string("Unexpected character '") + e.character() + std::string("' (code: ") + std::to_string(e.character_code()) + ")")
-					.severity(lsp::diagnostic_severity::error)
-					.diagnostic_range(yk_to_lsp(e.err_range()));
-			}
-		);
-	}
-
 	lsp::initialize_result initialize(lsp::initialize_params const& p) override {
-		if (p.process_id()) {
-			std::cerr << "Process id: " << *p.process_id() << std::endl;
-		}
-		if (auto const& wf = p.workspace_folders()) {
-			for (auto const& w : *wf) {
-				std::cerr << "Open workspace folder: " << w.name() << " - " << w.uri() << std::endl;
-			}
-		}
 		return lsp::initialize_result()
 			.capabilities(lsp::server_capabilities()
 				.text_document_sync(lsp::text_document_sync_kind::full)
@@ -68,13 +59,7 @@ struct my_server : public lsp::langserver {
 
 	void on_text_document_opened(lsp::did_open_text_document_params const& p) override {
 		m_URI = p.text_document().uri();
-		yk::err::clear();
-		m_Tokens = yk::lexer::all(p.text_document().text().c_str());
-		make_diagnostics();
-		std::cerr << "Tokens: " << std::endl;
-		for (auto const& t : m_Tokens) {
-			std::cerr << "  [" << t.start().row() << " :: " << t.start().column() << " - " << t.end().column() << "] - '" << t.value() << "'" << std::endl;
-		}
+		recompile(p.text_document().text().c_str());
 	}
 
 	void on_text_document_changed(lsp::did_change_text_document_params const& p) override {
@@ -82,17 +67,11 @@ struct my_server : public lsp::langserver {
 		auto const& change = p.content_changes().front();
 		lsp_assert(change.full_content());
 		std::string const& src = change.text();
-		yk::err::clear();
-		m_Tokens = yk::lexer::all(src.c_str());
-		make_diagnostics();
-		std::cerr << "Tokens: " << std::endl;
-		for (auto const& t : m_Tokens) {
-			std::cerr << "  [" << t.start().row() << " :: " << t.start().column() << " - " << t.end().column() << "] - '" << t.value() << "'" << std::endl;
-		}
+		recompile(src.c_str());
 	}
 
 	void on_text_document_saved(lsp::did_save_text_document_params const& p) override {
-		std::cerr << "Saved " << p.text_document().uri() << '!' << std::endl;
+		//std::cerr << "Saved " << p.text_document().uri() << '!' << std::endl;
 	}
 
 	std::vector<lsp::document_highlight> on_text_document_highlight(lsp::text_document_position_params const& p) override {
@@ -111,7 +90,6 @@ struct my_server : public lsp::langserver {
 	}
 
 	std::vector<lsp::folding_range> on_folding_range(lsp::folding_range_params const& p) override {
-		std::cerr << "Fold request!" << std::endl;
 		std::vector<lsp::folding_range> result;
 		for (auto const& t : m_Tokens) {
 			if (t.type() == yk::token::NestedComment) {
@@ -131,6 +109,17 @@ struct my_server : public lsp::langserver {
 		}
 		std::cerr << "Publishing " << errs.size() << " diagnostic messages" << std::endl;
 		publish_diagnostics(m_URI, diags);
+	}
+
+	void recompile(char const* src) {
+		yk::err::clear();
+		m_Tokens = yk::lexer::all(src);
+		make_diagnostics();
+
+		std::cerr << "Tokens: " << std::endl;
+		for (auto const& t : m_Tokens) {
+			std::cerr << "  [" << t.start().row() << " :: " << t.start().column() << " - " << t.end().column() << "] - '" << t.value() << "'" << std::endl;
+		}
 	}
 
 private:
