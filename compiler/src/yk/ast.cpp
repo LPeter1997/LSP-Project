@@ -2,6 +2,23 @@
 
 namespace yk {
 
+// Expressions /////////////////////////////////////////////////////////////////
+
+// Block expression
+
+expr::block expr::block::make(token const& lbr, token const& rbr,
+	std::vector<stmt*>&& stmts, expr* val) {
+	return block(lbr.range_(), rbr.range_(), std::move(stmts), val);
+}
+
+expr::block::block(std::optional<range>&& start, std::optional<range>&& end,
+	std::vector<stmt*>&& stmts, expr* val)
+	: m_StartBrace(std::move(start)), m_EndBrace(std::move(end)),
+	m_Statements(std::move(stmts)), m_ReturnValue(val) {
+}
+
+// Statements //////////////////////////////////////////////////////////////////
+
 // Function declaration
 
 stmt::fdecl stmt::fdecl::make(token const& name) {

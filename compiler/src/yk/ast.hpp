@@ -65,7 +65,28 @@ struct expr {
 	 * Block expression.
 	 */
 	struct block {
+		/**
+		 * Creates a block expression.
+		 * @param lbr The opening token ('{').
+		 * @param rbr The closing token ('}').
+		 * @param stmts The list of statements in the block.
+		 * @param val The return value of the block (can be nullptr).
+		 * @return The created block expression.
+		 */
+		static block make(token const& lbr, token const& rbr,
+			std::vector<stmt*>&& stmts, expr* val);
+		make_e();
 
+		block(block&&) = default;
+
+	private:
+		block(std::optional<range>&& start, std::optional<range>&& end,
+			std::vector<stmt*>&& stmts, expr* val);
+
+		std::optional<range> m_StartBrace;
+		std::optional<range> m_EndBrace;
+		std::vector<stmt*> m_Statements;
+		expr* m_ReturnValue;
 	};
 
 	////////////////////////////////////////////////////////////////////////////
