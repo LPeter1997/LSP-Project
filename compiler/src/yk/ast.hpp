@@ -38,6 +38,8 @@ struct terminal {
 	T value;
 	std::optional<range> pos;
 
+	terminal(terminal&&) = default;
+
 	/**
 	 * Creates a terminal value.
 	 * @param val The value itself (like the token lexeme or type).
@@ -59,7 +61,29 @@ make_terminal(T&& val, std::optional<range> pos = std::nullopt) {
  * ADT of expression nodes.
  */
 struct expr {
-	struct block;
+	/**
+	 * Block expression.
+	 */
+	struct block {
+
+	};
+
+	////////////////////////////////////////////////////////////////////////////
+
+	// The statement data type
+	using data_t = std::variant<
+		block
+	>;
+
+	data_t node;
+
+	expr(expr&&) = default;
+
+private:
+	template <typename T>
+	expr(T&& val)
+		: node(std::forward<T>(val)) {
+	}
 };
 
 /**
@@ -79,8 +103,9 @@ struct stmt {
 		 * @return The constructed declaration node.
 		 */
 		static fdecl make(token const& name);
-
 		make_s();
+
+		fdecl(fdecl&&) = default;
 
 	private:
 		fdecl(terminal<std::string>&& name,
@@ -94,8 +119,30 @@ struct stmt {
 	 * Function definition statement.
 	 */
 	struct fdef {
+		// XXX(LPeter1997): See fdecl TODO comment
 
+		/**
+		 * Creates a function definition.
+		 * @param name The name identifier token of the definition.
+		 * @param block The body of the function.
+		 * @return The constructed definition node.
+		 */
+		static fdef make(token const& name, expr::block&& block);
+		make_s();
+
+		fdef(fdef&&) = default;
+
+	private:
+		fdef(terminal<std::string>&& name,
+			std::optional<terminal<std::string>>&& expName,
+			expr::block&& body);
+
+		terminal<std::string> m_Name;
+		std::optional<terminal<std::string>> m_ExportName;
+		expr::block m_Body;
 	};
+
+	////////////////////////////////////////////////////////////////////////////
 
 	// The statement data type
 	using data_t = std::variant<
@@ -103,6 +150,8 @@ struct stmt {
 	>;
 
 	data_t node;
+
+	stmt(stmt&&) = default;
 
 private:
 	template <typename T>
