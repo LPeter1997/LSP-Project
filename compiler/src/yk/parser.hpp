@@ -43,6 +43,14 @@ struct parser {
 
 private:
 	/**
+	 * Peeks the next token. If it's type matches the given one, it gets
+	 * consumed. And returned.
+	 * @param tag The token type to match the next token against.
+	 * @return A pointer to the consumed token or nullptr if didn't match.
+	 */
+	token const* match(token::type_t tag);
+
+	/**
 	 * Peeks (but does not consume) forward in the token source.
 	 * @param delta The amount to peek forward (1 by default).
 	 * @return The peeked token.

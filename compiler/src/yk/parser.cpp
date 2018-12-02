@@ -13,18 +13,31 @@ std::vector<stmt*> parser::decl_list() {
 }
 
 stmt* parser::decl() {
-	// XXX(LPeter1997): Implement
+	if (auto* fn_kw = match(token::Keyword_Fn)) {
+		// 'fn'
+		// XXX(LPeter1997): identifier '(' ')' ...
+	}
 	return nullptr;
 }
 
 // Helper functionality
+
+token const* parser::match(token::type_t tag) {
+	token const& t = peek();
+	if (t.type() == tag) {
+		return &consume();
+	}
+	else {
+		return nullptr;
+	}
+}
 
 token const& parser::peek(u32 delta) const {
 	return (*m_Tokens)[m_Index + delta];
 }
 
 token const& parser::consume() {
-	auto const& t = (*m_Tokens)[m_Index];
+	auto const& t = peek();
 	++m_Index;
 	return t;
 }
