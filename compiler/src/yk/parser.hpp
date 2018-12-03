@@ -11,10 +11,12 @@
 #define YK_PARSER_HPP
 
 #include <vector>
-#include "ast.hpp"
 #include "lexer.hpp"
 
 namespace yk {
+
+struct expr;
+struct stmt;
 
 /**
  * The parser object itself. Takes a list of tokens and constructs an AST by the
@@ -40,6 +42,13 @@ struct parser {
 	 * @return The parsed declaration node or nullptr if there was a problem.
 	 */
 	stmt* decl();
+
+	/**
+	 * Parses a block expression.
+	 * @return The parsed block expression node or nullptr if there was a
+	 * problem.
+	 */
+	expr::block* block();
 
 private:
 	/**

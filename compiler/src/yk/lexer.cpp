@@ -78,6 +78,9 @@ static u32 calculate_length(token::type_t ty, std::string const& val) {
 	case token::Keyword_Fn:
 		return 2;
 
+	case token::Keyword_Foreign:
+		return 7;
+
 	case token::Identifier:
 	case token::Integer:
 		return val.length();
@@ -254,6 +257,8 @@ token lexer::next() {
 			}
 		} break;
 
+		case ';': return make_simple(token::Semicolon);
+
 		case '(': return make_simple(token::LeftParen);
 		case ')': return make_simple(token::RightParen);
 
@@ -281,6 +286,9 @@ token lexer::next() {
 
 			if (std::strncmp(m_Source, "fn", len) == 0) {
 				return make_simple(token::Keyword_Fn, len);
+			}
+			else if (std::strncmp(m_Source, "foreign", len) == 0) {
+				return make_simple(token::Keyword_Foreign, len);
 			}
 			else {
 				return make_textual(token::Identifier, len);

@@ -134,12 +134,14 @@ struct token {
 		EndOfFile,			// EOF
 		LineComment,		// //[^<newline>]*
 		NestedComment,		// /*<recurse>*/
+		Semicolon,			// ';'
 		LeftParen,			// '('
 		RightParen,			// ')'
 		LeftBrace,			// '{'
 		RightBrace,			// '}'
 		Colon,				// ':'
 		Keyword_Fn,			// 'fn'
+		Keyword_Foreign,	// 'foreign'
 		Identifier,			// [A-Za-z_][A-Za-z0-9_]*
 		Integer,			// [0-9]+
 	};
