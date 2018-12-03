@@ -68,9 +68,36 @@ private:
 	char m_Char;
 };
 
+/**
+ * Error when we encounter something at parsing that we cannot continue from.
+ * Like there is a token that cannot possibly start a declaration when we need
+ * to parse one.
+ */
+struct unexpected_token {
+	/**
+	 * Creates an unexpected token error.
+	 * @param tok The token that came unexpected for the parser.
+	 * @param instead The description that was expected instead (nullptr by
+	 * default).
+	 */
+	explicit unexpected_token(token const& tok, char const* instead = nullptr)
+		: m_Token(tok), m_Instead(instead) {
+	}
+
+	token const& tok() const { return m_Token; }
+	char const* expected_instead() const { return m_Instead; }
+
+	range err_range() const { return tok().range_(); }
+
+private:
+	token m_Token;
+	char const* m_Instead;
+};
+
 using error_t = std::variant<
 	unclosed_comment,
-	unexpected_char
+	unexpected_char,
+	unexpected_token
 >;
 
 /**
