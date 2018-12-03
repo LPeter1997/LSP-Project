@@ -73,6 +73,7 @@ static u32 calculate_length(token::type_t ty, std::string const& val) {
 	case token::LeftBrace:
 	case token::RightBrace:
 	case token::Colon:
+	case token::Semicolon:
 		return 1;
 
 	case token::Keyword_Fn:

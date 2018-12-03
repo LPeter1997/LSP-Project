@@ -10,19 +10,25 @@
 #ifndef YK_PARSER_HPP
 #define YK_PARSER_HPP
 
+#include <optional>
 #include <vector>
+#include "ast.hpp"
 #include "lexer.hpp"
 
 namespace yk {
-
-struct expr;
-struct stmt;
 
 /**
  * The parser object itself. Takes a list of tokens and constructs an AST by the
  * language grammar.
  */
 struct parser {
+	/**
+	 * A utility function that parses a token source until the end and returns
+	 * the resulting global declaration list in a vector.
+	 * @return A vector of declaration statement nodes.
+	 */
+	static std::vector<stmt*> all(std::vector<token> const& toks);
+
 	/**
 	 * Creates a parser for a given token source.
 	 * @param toks The tokens to parse from.
@@ -45,10 +51,10 @@ struct parser {
 
 	/**
 	 * Parses a block expression.
-	 * @return The parsed block expression node or nullptr if there was a
+	 * @return The parsed block expression node or nullopt if there was a
 	 * problem.
 	 */
-	expr::block* block();
+	std::optional<expr::block> block();
 
 private:
 	/**

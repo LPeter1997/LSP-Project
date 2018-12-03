@@ -3,6 +3,11 @@
 
 namespace yk {
 
+std::vector<stmt*> parser::all(std::vector<token> const& toks) {
+	auto p = parser(toks);
+	return p.decl_list();
+}
+
 std::vector<stmt*> parser::decl_list() {
 	std::vector<stmt*> result;
 	while (!is_eof()) {
@@ -40,14 +45,12 @@ stmt* parser::decl() {
 			return stmt::fdecl::make_stmt(*fn_name);
 		}
 		else {
-			auto* body = block();
+			auto body = block();
 			yk_assert(body);
 
 			// XXX(LPeter1997): If there was no body, we could return a
 			// pseudo-body so the function signature would be registered for
 			// semantic checking.
-
-			// XXX(LPeter1997): Body is heap-allocated, free that?
 
 			return stmt::fdef::make_stmt(*fn_name, std::move(*body));
 		}
@@ -55,15 +58,14 @@ stmt* parser::decl() {
 	return nullptr;
 }
 
-expr::block* parser::block() {
+std::optional<expr::block> parser::block() {
 	if (auto* lbrace = match(token::LeftBrace)) {
 		auto* rbrace = match(token::RightBrace);
 		yk_assert(rbrace);
 
-		// XXX(LPeter1997): The API is not correct for now...
 		return expr::block::make(*lbrace, *rbrace, {}, nullptr);
 	}
-	return nullptr;
+	return std::nullopt;
 }
 
 // Helper functionality

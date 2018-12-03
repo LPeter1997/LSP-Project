@@ -13,10 +13,10 @@
 #include "common.hpp"
 #include "lexer.hpp"
 
-#define make_heap(base) 						\
-template <typename... TFwd> 					\
-static base* make_##base(TFwd&&... params) { 	\
-	return make(std::forward<TFwd>(params)...);	\
+#define make_heap(base) 									\
+template <typename... TFwd> 								\
+static base* make_##base(TFwd&&... params) { 				\
+	return new base(make(std::forward<TFwd>(params)...));	\
 }
 
 #define make_e() make_heap(expr)
@@ -100,7 +100,6 @@ struct expr {
 
 	expr(expr&&) = default;
 
-private:
 	template <typename T>
 	expr(T&& val)
 		: node(std::forward<T>(val)) {
@@ -174,7 +173,6 @@ struct stmt {
 
 	stmt(stmt&&) = default;
 
-private:
 	template <typename T>
 	stmt(T&& val)
 		: node(std::forward<T>(val)) {
