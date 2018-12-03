@@ -66,6 +66,15 @@ private:
 	token const* match(token::type_t tag);
 
 	/**
+	 * Peeks the next token and consumes it. If it does not match a given token
+	 * type, an unexpected token error is raised.
+	 * @param tag The token type to match the next token against.
+	 * @param desc The description of the expected token.
+	 * @return A pointer to the consumed token or nullptr if didn't match.
+	 */
+	token const* expect(token::type_t tag, char const* desc);
+
+	/**
 	 * Peeks (but does not consume) forward in the token source.
 	 * @param delta The amount to peek forward (1 by default).
 	 * @return The peeked token.

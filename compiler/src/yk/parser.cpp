@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "error.hpp"
 #include "parser.hpp"
 
 namespace yk {
@@ -22,16 +23,13 @@ stmt* parser::decl() {
 	if (auto* fn_kw = match(token::Keyword_Fn)) {
 		// 'fn'
 
-		auto* fn_name = match(token::Identifier);
-		// XXX(LPeter1997): Expect & error instead of assert
-		yk_assert(fn_name);
+		auto* fn_name = expect(token::Identifier, "function name");
+		if (!fn_name) return nullptr;
 
 		// 'fn' name
 
-		auto* lparen = match(token::LeftParen);
-		yk_assert(lparen);
-		auto* rparen = match(token::RightParen);
-		yk_assert(rparen);
+		expect(token::LeftParen, "'('");
+		expect(token::RightParen, "')'");
 
 		// 'fn' name()
 
@@ -39,14 +37,12 @@ stmt* parser::decl() {
 
 		if (auto* foreign_kw = match(token::Keyword_Foreign)) {
 			// Declaration
-			auto* semicol = match(token::Semicolon);
-			yk_assert(semicol);
-
+			expect(token::Semicolon, "';'");
 			return stmt::fdecl::make_stmt(*fn_name);
 		}
 		else {
 			auto body = block();
-			yk_assert(body);
+			if (!body) return nullptr;
 
 			// XXX(LPeter1997): If there was no body, we could return a
 			// pseudo-body so the function signature would be registered for
@@ -55,13 +51,22 @@ stmt* parser::decl() {
 			return stmt::fdef::make_stmt(*fn_name, std::move(*body));
 		}
 	}
+	else {
+		err::report(err::unexpected_token(peek(), "declaration"));
+		// Consume so we don't get stuck here
+		// XXX(LPeter1997): Might be a better strategy to sync to the next decl
+		// token
+		consume();
+	}
 	return nullptr;
 }
 
 std::optional<expr::block> parser::block() {
-	if (auto* lbrace = match(token::LeftBrace)) {
-		auto* rbrace = match(token::RightBrace);
-		yk_assert(rbrace);
+	if (auto* lbrace = expect(token::LeftBrace, "'{'")) {
+		auto* rbrace = expect(token::RightBrace, "'}'");
+		// XXX(LPeter1997): Auto-close to continue? (no need to throw away the
+		// block)
+		if (!rbrace) return std::nullopt;
 
 		return expr::block::make(*lbrace, *rbrace, {}, nullptr);
 	}
@@ -76,6 +81,20 @@ token const* parser::match(token::type_t tag) {
 		return &consume();
 	}
 	else {
+		return nullptr;
+	}
+}
+
+token const* parser::expect(token::type_t tag, char const* desc) {
+	token const& t = peek();
+	if (t.type() == tag) {
+		return &consume();
+	}
+	else {
+		if (!is_eof()) {
+			consume();
+		}
+		err::report(err::expected_token(t, desc));
 		return nullptr;
 	}
 }

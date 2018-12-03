@@ -3,6 +3,7 @@
 #include <lsp/lsp.hpp>
 #include <yk/error.hpp>
 #include <yk/lexer.hpp>
+#include <yk/parser.hpp>
 
 static lsp::position yk_to_lsp(yk::position const& p) {
 	return lsp::position(p.row(), p.column());
@@ -37,6 +38,22 @@ static lsp::diagnostic error_to_diagnostic(yk::err::error_t const& err) {
 		[](yk::err::unexpected_char const& e) {
 			return lsp::diagnostic()
 				.message(std::string("Unexpected character '") + e.character() + std::string("' (code: ") + std::to_string(e.character_code()) + ")")
+				.severity(lsp::diagnostic_severity::error)
+				.diagnostic_range(yk_to_lsp(e.err_range()));
+		},
+		[](yk::err::unexpected_token const& e) {
+			auto msg = std::string("Unexpected token!");
+			if (e.expected_instead()) {
+				msg += std::string(" In this context ") + e.expected_instead() + std::string(" is expected!");
+			}
+			return lsp::diagnostic()
+				.message(std::move(msg))
+				.severity(lsp::diagnostic_severity::error)
+				.diagnostic_range(yk_to_lsp(e.err_range()));
+		},
+		[](yk::err::expected_token const& e) {
+			return lsp::diagnostic()
+				.message(std::string("Unexpected token, expected ") + e.expectation() + std::string(" instead!"))
 				.severity(lsp::diagnostic_severity::error)
 				.diagnostic_range(yk_to_lsp(e.err_range()));
 		}
@@ -113,7 +130,11 @@ struct my_server : public lsp::langserver {
 
 	void recompile(char const* src) {
 		yk::err::clear();
+		std::cerr << "Starting lexing..." << std::endl;
 		m_Tokens = yk::lexer::all(src);
+		std::cerr << "Starting parsing..." << std::endl;
+		/* ast =  */ yk::parser::all(m_Tokens);
+		std::cerr << "Making diagnostics..." << std::endl;
 		make_diagnostics();
 
 		std::cerr << "Tokens: " << std::endl;

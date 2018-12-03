@@ -94,10 +94,34 @@ private:
 	char const* m_Instead;
 };
 
+/**
+ * Error when we expect a kind of token but get something else.
+ */
+struct expected_token {
+	/**
+	 * Creates an expected token error.
+	 * @param tok The token that came instead of the expected token.
+	 * @param expectation The description that was expected.
+	 */
+	explicit expected_token(token const& tok, char const* expectation)
+		: m_Got(tok), m_Expectation(expectation) {
+	}
+
+	token const& got() const { return m_Got; }
+	char const* expectation() const { return m_Expectation; }
+
+	range err_range() const { return got().range_(); }
+
+private:
+	token m_Got;
+	char const* m_Expectation;
+};
+
 using error_t = std::variant<
 	unclosed_comment,
 	unexpected_char,
-	unexpected_token
+	unexpected_token,
+	expected_token
 >;
 
 /**
