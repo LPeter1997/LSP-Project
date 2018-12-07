@@ -86,6 +86,7 @@ token const* parser::match(token::type_t tag) {
 }
 
 token const* parser::expect(token::type_t tag, char const* desc) {
+	// XXX(LPeter1997): Maybe not consume but synchronize?
 	token const& t = peek();
 	if (t.type() == tag) {
 		return &consume();

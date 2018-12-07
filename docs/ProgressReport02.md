@@ -8,7 +8,7 @@ Mielőtt interakciókat tudnánk leírni a kliens és szerver között, meg kell
 
 ### A klasszikus fordítási modell
 Néhány extrémet leszámítva a mai fordítók nagyjából ugyanazt a fordítási modellt követik:
-![A fordítás folyamata](./CompilationProcess.svg)
+![A fordítás folyamata](./res/CompilationProcess.svg)
 **Note:** _Sokszor nem különböztetnek meg Parse Tree-t és AST-t, mert egy és ugyanazon struktúrát használják az implementációnál. Elviekben a különbség annyi, hogy az AST nem tartalmaz fölösleges szintaktikai elemeket, illetve szemantikai információt hordoz, például referenciákat szimbólumokhoz._
 
 Manapság divat a backend részleget egy létező megoldásra, leggyakoribb esetben például az [LLVM](https://llvm.org/)-re hagyni.
@@ -38,7 +38,7 @@ Jelenleg a projekt 2 modulból áll: egy nyelvi szerverből - mely főként egy 
 - **Language Client(s)**: Egyszerű, pár soros plug-inok az editorokhoz. Feladatuk elindítani a nyelvi szervert és beállítani a kommunikáció módját. Ebben a projektben jelenleg csak VS Code-hoz van ilyen. Ha egyszer megírtuk, általában nem változik.
 
 ### Az új architektúra függőségi gráfja:
-![A projekt függőségei](./ProjectDependency.svg)
+![A projekt függőségei](./res/ProjectDependency.svg)
 
 Ez egy előnyös felépítés, a compiler, editor API és a protokoll (így a framework is) viszonylag ritkán változik, így a függőségek stabil irányba mutatnak. Bár a nyelvi kliens függ a szervertől, általában a változás nem érinti a klienst.
 
@@ -61,39 +61,39 @@ Ha kattintunk, szeretnénk a teljes terminálist kiemelve látni. Így például
 
 Az implementáció előtt:
 
-![Egysoros komment szavanként kiemelve](./Highlight_Before01.PNG)
-![Többsoros komment szavanként kiemelve](./Highlight_Before02.PNG)
+![Egysoros komment szavanként kiemelve](./res/Highlight_Before01.PNG)
+![Többsoros komment szavanként kiemelve](./res/Highlight_Before02.PNG)
 
 Implementáció után:
 
-![Egysoros komment teljesen kiemelve](./Highlight_After01.PNG)
-![Többsoros komment teljesen kiemelve](./Highlight_After02.PNG)
+![Egysoros komment teljesen kiemelve](./res/Highlight_After01.PNG)
+![Többsoros komment teljesen kiemelve](./res/Highlight_After02.PNG)
 
 ### Többsoros kommentek összecsukása
 Mivel a nyelvben rekurzív kommentek vannak, a VS Code-ba (és a legtöbb editorba) beépített összecsukási mechanizmus egyszerűen félrevezető. Összecsukás előtt:
 
-![Nem összecsukott komment](./Comment_Unfolded.PNG)
+![Nem összecsukott komment](./res/Comment_Unfolded.PNG)
 
 Összecsukás után:
 
-![Rosszul összecsukott komment](./Comment_Bad_Fold.PNG)
+![Rosszul összecsukott komment](./res/Comment_Bad_Fold.PNG)
 
 A protokollban mindössze jeleznünk kell a képességet, ezután minden kódbéli változásnál kapunk egy [folding range request](https://microsoft.github.io/language-server-protocol/specification#textDocument_foldingRange)-et. Válaszul az összes összecsukható elem intervallumát meg kell adjuk. Jelen esetben elég, ha az összes többsoros komment token intervallumát adjuk válaszul. Az eredmény:
 
-![Jól összecsukott komment](Comment_Good_Fold.PNG)
+![Jól összecsukott komment](./res/Comment_Good_Fold.PNG)
 
 ### Hiba: Nem várt karakter
 Minden hiba, warning és hint visszajelzése diagnostic leírásokkal történik. A szerver egy [publish diagnostics](https://microsoft.github.io/language-server-protocol/specification#textDocument_publishDiagnostics) üzenetben le kell írja az összes diagnosztikai információt, melyet az adott file-hoz kíván csatolni. A kliens nem képes diagnosztika halmozására, mindig az összes megjelenítendő információt kell elküldeni.
 
 Az előző két fícsörnél talán hasznosabb, ha hiba visszajelzéseket adunk. Egy nagyon egyszerű - még parser-t nem igénylő - szintaktikai hiba például ha olyan karakter kerül a forrásba, mely ott nem szerepelhet a lexikai szabályok szerint.
 
-![Nem várt karakter hiba](./Unexpected_Char.png)
+![Nem várt karakter hiba](./res/Unexpected_Char.png)
 
 ### Hiba: Lezáratlan komment
 Mivel a nyelv támogat egymásba ágyazható - rekurzív - kommenteket, érdemes jelezni, ha egy komment nem lett lezárva a file vége előtt, és ha ez történt, milyen mélységben jár a komment.
 
-![Lezáratlan komment hiba](./Unclosed_Comment_1.png)
-![Lezáratlan komment hiba](./Unclosed_Comment_2.png)
+![Lezáratlan komment hiba](./res/Unclosed_Comment_1.png)
+![Lezáratlan komment hiba](./res/Unclosed_Comment_2.png)
 
 ## Hova tovább?
 A lexikai rész alapjai ezzel kimerültek visszajelzés szempontjából. A következő fordítási fázisban - elemzés/parsing -  visszajelezhetünk olyan hibákat, melyeket kezdő vagy gyakorlatlan programozók sokat követnek el. Ilyenek a lehagyott pontosvessző, bezáratlan zárójelpár, stb. Mindenek előtt dizájnolnunk kell egy AST-t, és meg kell válasszuk az elemző metódusunkat.
