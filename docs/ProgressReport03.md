@@ -18,14 +18,14 @@ A lépések alatt történhet szintaktikai átalakítás, mikoris egy csomópont
 
 **Fontos kérdés:** Hogyan ábrázoljuk a szükséges struktúrákat úgy, hogy tükrözze a fordítási folyamat állását, könnyen bővíthető legyen, állja a változást és még a használata is kényelmes legyen?
 
-A meglévő probléma - egyelőre még csak elvi kérdés - mellé még bejön az, hogy a diagnosztikai üzenetekhez pozíciókat is kell tárolnunk a levelekhez. Viszont nem bízhatunk abban, hogy pozícionális információ mindenhol rendelkezésre fog állni, az injektált elemeknek például nem is lehet - tipikusan metaprogramozásból eredő elemek.
+Szükséges tehát, hogy a fordítás folyamán egyazon struktúra bővüljön elemekkel, ennek ellenére a kódbéli reprezentációt ne szennyezzék egy adott fázisban fölösleges elemek. Emellé még bejön az, hogy a diagnosztikai üzenetekhez pozíciókat is kell tárolnunk, viszont nem bízhatunk abban hogy pozícionális információ mindenhol rendelkezésre fog állni, az injektált elemeknek például nem is lehet - tipikusan metaprogramozásból eredő elemek.
 
 A GHC kapcsán már foglalkoztak a fa struktúrák - különösképp az AST - bővíthetőségének problémájával egy [publikációban](https://www.microsoft.com/en-us/research/uploads/prod/2016/11/trees-that-grow.pdf).
 
 ## Elemzés
 Az AST előállításához szükséges egy elemzési "taktika". A (program)nyelvészet kezdete óta rengeteg módszert és automatizáló eszközt dolgoztak ki. Már a 70-es évek elején megjelent [Yacc](https://en.wikipedia.org/wiki/Yacc) neve - Yet Another Compiler-Compiler - is azt sugallja, hogy a nyelvi elemzés gyökerei mélyre nyúlnak, közel sem új probléma.
 
-Mivel szeretnénk maximalizálni a visszajelzés minőségét, ezért egy olyan módszert kell válasszunk, melyet könnyen írhatunk kézzel a nyelvtanból. Ehhez tökéletes az úgynevezett [recursive descent parser](https://en.wikipedia.org/wiki/Recursive_descent_parser). Lényegében a nemterminálisok függvények lesznek, a terminálisok pedig léptetés a token bemenetben. Hátránya, hogy a [balrekurziót manuálisan eliminálni kell](https://en.wikipedia.org/wiki/Left_recursion), ha matematikai kifejezéseket akarunk elemezni.
+Mivel szeretnénk maximalizálni a visszajelzés minőségét, ezért egy olyan módszert kell válasszunk, melyet könnyen írhatunk kézzel a nyelvtanból. Jó választás erre az úgynevezett [recursive descent parser](https://en.wikipedia.org/wiki/Recursive_descent_parser), mivel könnyen írható kézzel és az egyik leggyorsabb elemzési módszer. Lényegében a nemterminálisok függvények lesznek, a terminálisok pedig léptetés a token bemenetben. Egyik nagy hátránya, hogy a [balrekurziót manuálisan eliminálni kell](https://en.wikipedia.org/wiki/Left_recursion), ha matematikai kifejezéseket akarunk elemezni.
 
 ## Hibák, visszaállítás
 Ha elemzés közben nem várt tokenhez érkezünk, hibát jelzünk. De egy fontos kérdés, hogy hogyan folytassuk ez után? Egy jó nyelvi eszköztől elvárjuk hogy egynél több hibát jelezzen egyszerre, de egy felhasználói hibáról csak egyetlen releváns értesítést kapjunk - tehát a hibák ne eszkalálódjanak. Még jobb lenne, ha a fordítás ennek ellenére folytatódhatna, és a szintaktikai hibák ellenére szemantikai visszajelzést is kaphatnánk.
